@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../models/pet_model.dart';
 import '../../../core/utils/image_processor.dart';
 
@@ -7,10 +8,11 @@ import '../../../core/utils/image_processor.dart';
 /// Handles CRUD operations and image storage using Base64 encoding
 class PetRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// Default user ID (no authentication required)
-  /// All users share the same data for simplicity
-  String get _currentUserId => 'default_user';
+  /// Get current authenticated user ID
+  /// Falls back to 'default_user' if no user is authenticated
+  String get _currentUserId => _auth.currentUser?.uid ?? 'default_user';
 
   /// Reference to the pets collection
   CollectionReference get _petsCollection => _firestore.collection('pets');
@@ -24,7 +26,9 @@ class PetRepository {
       // Process image if provided
       String? base64Image;
       if (imageFile != null) {
-        base64Image = await ImageProcessor.compressAndConvertToBase64(imageFile);
+        base64Image = await ImageProcessor.compressAndConvertToBase64(
+          imageFile,
+        );
       }
 
       // Create pet with image
@@ -61,7 +65,9 @@ class PetRepository {
       // Process new image if provided
       String? base64Image = pet.imageBase64;
       if (imageFile != null) {
-        base64Image = await ImageProcessor.compressAndConvertToBase64(imageFile);
+        base64Image = await ImageProcessor.compressAndConvertToBase64(
+          imageFile,
+        );
       }
 
       // Create updated pet data
@@ -103,10 +109,7 @@ class PetRepository {
 
       if (!doc.exists) return null;
 
-      return PetModel.fromFirestore(
-        doc.data() as Map<String, dynamic>,
-        doc.id,
-      );
+      return PetModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
     } catch (e) {
       print('Error getting pet: $e');
       return null;
@@ -121,21 +124,21 @@ class PetRepository {
       print('🔵 Fetching pets for user: $_currentUserId');
 
       // Temporarily remove orderBy to avoid index issues
-      final querySnapshot = await _petsCollection
-          .where('userId', isEqualTo: _currentUserId)
-          .get();
+      final querySnapshot =
+          await _petsCollection
+              .where('userId', isEqualTo: _currentUserId)
+              .get();
 
       print('🔵 Query returned ${querySnapshot.docs.length} documents');
 
-      final pets = querySnapshot.docs
-          .map((doc) {
+      final pets =
+          querySnapshot.docs.map((doc) {
             print('🔵 Processing pet document: ${doc.id}');
             return PetModel.fromFirestore(
               doc.data() as Map<String, dynamic>,
               doc.id,
             );
-          })
-          .toList();
+          }).toList();
 
       print('🟢 Successfully loaded ${pets.length} pets');
       return pets;
@@ -154,12 +157,17 @@ class PetRepository {
         .where('userId', isEqualTo: _currentUserId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => PetModel.fromFirestore(
-                  doc.data() as Map<String, dynamic>,
-                  doc.id,
-                ))
-            .toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map(
+                    (doc) => PetModel.fromFirestore(
+                      doc.data() as Map<String, dynamic>,
+                      doc.id,
+                    ),
+                  )
+                  .toList(),
+        );
   }
 
   /// Search pets by name
@@ -172,16 +180,19 @@ class PetRepository {
         return [];
       }
 
-      final querySnapshot = await _petsCollection
-          .where('userId', isEqualTo: _currentUserId)
-          .get();
+      final querySnapshot =
+          await _petsCollection
+              .where('userId', isEqualTo: _currentUserId)
+              .get();
 
       // Filter by name (Firestore doesn't support case-insensitive search)
       return querySnapshot.docs
-          .map((doc) => PetModel.fromFirestore(
-                doc.data() as Map<String, dynamic>,
-                doc.id,
-              ))
+          .map(
+            (doc) => PetModel.fromFirestore(
+              doc.data() as Map<String, dynamic>,
+              doc.id,
+            ),
+          )
           .where((pet) => pet.name.toLowerCase().contains(query.toLowerCase()))
           .toList();
     } catch (e) {
@@ -200,17 +211,20 @@ class PetRepository {
         return [];
       }
 
-      final querySnapshot = await _petsCollection
-          .where('userId', isEqualTo: _currentUserId)
-          .where('species', isEqualTo: species)
-          .orderBy('createdAt', descending: true)
-          .get();
+      final querySnapshot =
+          await _petsCollection
+              .where('userId', isEqualTo: _currentUserId)
+              .where('species', isEqualTo: species)
+              .orderBy('createdAt', descending: true)
+              .get();
 
       return querySnapshot.docs
-          .map((doc) => PetModel.fromFirestore(
-                doc.data() as Map<String, dynamic>,
-                doc.id,
-              ))
+          .map(
+            (doc) => PetModel.fromFirestore(
+              doc.data() as Map<String, dynamic>,
+              doc.id,
+            ),
+          )
           .toList();
     } catch (e) {
       print('Error filtering pets by species: $e');

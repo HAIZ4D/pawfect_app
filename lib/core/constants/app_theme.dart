@@ -11,8 +11,8 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       primaryColor: PawfectColors.pawfectOrange,
-      scaffoldBackgroundColor: PawfectColors.pawfectCream, // Warm cream background
-
+      scaffoldBackgroundColor:
+          PawfectColors.pawfectCream, // Warm cream background
       // 🎨 Color Scheme (Official PawFect Colors)
       colorScheme: const ColorScheme.light(
         primary: PawfectColors.pawfectOrange, // Orange for primary actions
@@ -40,9 +40,7 @@ class AppTheme {
           fontWeight: FontWeight.bold,
           color: PawfectColors.pawfectWhite,
         ),
-        iconTheme: IconThemeData(
-          color: PawfectColors.pawfectWhite,
-        ),
+        iconTheme: IconThemeData(color: PawfectColors.pawfectWhite),
       ),
 
       // Text Theme
@@ -68,7 +66,8 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: PawfectColors.buttonPrimary, // Orange
           foregroundColor: PawfectColors.buttonText, // White
-          disabledBackgroundColor: PawfectColors.buttonDisabled, // Orange at 40%
+          disabledBackgroundColor:
+              PawfectColors.buttonDisabled, // Orange at 40%
           disabledForegroundColor: PawfectColors.textDisabled, // Black at 40%
           elevation: 2,
           shadowColor: const Color(0x26000000), // Button shadow (15% opacity)
@@ -113,14 +112,21 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: PawfectColors.pawfectWhite, // White input fields
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: PawfectColors.borderLight), // Light border
+          borderSide: const BorderSide(
+            color: PawfectColors.borderLight,
+          ), // Light border
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: PawfectColors.borderLight), // Light border
+          borderSide: const BorderSide(
+            color: PawfectColors.borderLight,
+          ), // Light border
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -143,7 +149,7 @@ class AppTheme {
       ),
 
       // 🎴 Card Theme (White cards with subtle shadow)
-      cardTheme: const CardTheme(
+      cardTheme: const CardThemeData(
         elevation: 2,
         shadowColor: Color(0x0D000000), // Black at 5% opacity
         shape: RoundedRectangleBorder(
@@ -179,7 +185,8 @@ class AppTheme {
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: PawfectColors.pawfectWhite, // White background
         selectedItemColor: PawfectColors.pawfectOrange, // Orange when selected
-        unselectedItemColor: PawfectColors.textHint, // Hint color when unselected
+        unselectedItemColor:
+            PawfectColors.textHint, // Hint color when unselected
         type: BottomNavigationBarType.fixed,
         elevation: 8,
         selectedLabelStyle: PawfectTextStyles.labelSmall,
@@ -187,12 +194,10 @@ class AppTheme {
       ),
 
       // Dialog Theme
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: PawfectColors.pawfectWhite,
         elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         titleTextStyle: PawfectTextStyles.h4,
         contentTextStyle: PawfectTextStyles.bodyMedium,
       ),
@@ -203,9 +208,7 @@ class AppTheme {
         contentTextStyle: PawfectTextStyles.bodyMedium.copyWith(
           color: PawfectColors.pawfectWhite,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         behavior: SnackBarBehavior.floating,
       ),
 
