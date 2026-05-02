@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../models/diagnosis_model.dart';
 import 'dart:convert';
 
@@ -8,8 +9,17 @@ import 'dart:convert';
 class IllnessDetectorRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Default user ID (no authentication required)
-  String get _currentUserId => 'default_user';
+  /// UID of the currently signed-in user. Throws if nobody is signed in
+  /// — flows that reach diagnosis save are auth-gated upstream.
+  String get _currentUserId {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      throw StateError(
+        'IllnessDetectorRepository accessed without a signed-in user.',
+      );
+    }
+    return uid;
+  }
 
   /// Reference to the diagnoses collection
   CollectionReference get _diagnosesCollection =>

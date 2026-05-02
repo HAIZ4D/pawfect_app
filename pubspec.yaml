@@ -62,5 +62,4 @@ flutter:
 
   assets:
     - assets/images/
-    - assets/ml_models/
     - .env

@@ -55,6 +55,8 @@ firebase_options.dart
 google-services.json
 google-services*.json
 GoogleService-Info.plist
+# Firebase deploy cache (build artifact)
+.firebase/
 
 # Claude Code - settings and instructions (local only)
 .claude/

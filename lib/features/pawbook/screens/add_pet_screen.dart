@@ -4,6 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/liquid_app_bar.dart';
+import '../../../core/widgets/liquid_background.dart';
 import '../../../models/pet_model.dart';
 import '../providers/pet_provider.dart';
 
@@ -239,21 +242,23 @@ class _AddPetScreenState extends State<AddPetScreen> {
   Widget build(BuildContext context) {
     final isEdit = widget.pet != null;
 
+    final topInset = MediaQuery.of(context).padding.top;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: PawfectColors.pawfectCream,
-      appBar: AppBar(
-        title: Text(
-          isEdit ? 'Edit Pet' : 'Add New Pet',
-          style: PawfectTextStyles.h3,
-        ),
-        backgroundColor: PawfectColors.pawfectOrange,
-        foregroundColor: Colors.white,
-        elevation: 0,
+      appBar: LiquidAppBar(
+        title: isEdit ? 'Edit Pet' : 'Add New Pet',
+        subtitle: isEdit ? 'Update profile' : 'Welcome a new companion',
+        icon: Icons.pets_rounded,
+        showBackButton: true,
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
+      body: Stack(
+        children: [
+          const LiquidBackground(),
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, topInset + 132, 20, 32),
+            child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -263,12 +268,10 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 const SizedBox(height: 24),
 
                 // Form Card
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [PawfectColors.cardShadow],
-                  ),
+                GlassCard(
+                  radius: 24,
+                  blur: 20,
+                  tintOpacity: 0.55,
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -399,35 +402,56 @@ class _AddPetScreenState extends State<AddPetScreen> {
                 const SizedBox(height: 24),
 
                 // Save Button
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _handleSave,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: PawfectColors.pawfectOrange,
-                    foregroundColor: Colors.white,
+                GestureDetector(
+                  onTap: _isLoading ? null : _handleSave,
+                  child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text(
-                          isEdit ? 'Update Pet' : 'Add Pet',
-                          style: PawfectTextStyles.button,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          PawfectColors.pawfectOrange,
+                          Color(0xFFFFB347),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: PawfectColors.pawfectOrange.withOpacity(0.4),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
                         ),
+                      ],
+                    ),
+                    child: Center(
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              isEdit ? 'Update Pet' : 'Add Pet',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        ),
+          ),
+        ],
       ),
     );
   }

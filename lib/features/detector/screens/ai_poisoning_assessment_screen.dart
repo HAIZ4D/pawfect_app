@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/widgets/ai_loading_animation.dart';
+import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/liquid_app_bar.dart';
+import '../../../core/widgets/liquid_background.dart';
 import '../../../models/toxic_substance_model.dart';
 import '../../../models/pet_model.dart';
 import '../../../models/poisoning_incident_model.dart';
@@ -11,7 +13,6 @@ import '../../../models/poison_substance_model.dart';
 import '../../../repositories/poisoning_incident_repository.dart';
 import '../../../services/pdf_report_generator.dart';
 import '../../../services/ai_poisoning_assessment_service.dart';
-import '../../pawbook/providers/pet_provider.dart';
 import '../../pawbook/screens/pdf_viewer_screen.dart';
 import '../../poisoning_detection/screens/vet_finder_screen.dart';
 
@@ -238,19 +239,26 @@ class _AIPoisoningAssessmentScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: PawfectColors.pawfectCream,
-      appBar: AppBar(
-        title: Text('AI Risk Assessment', style: PawfectTextStyles.h3),
-        backgroundColor: _assessment != null
-            ? _getRiskColor(_assessment!.riskLevel)
-            : PawfectColors.error,
-        foregroundColor: Colors.white,
+      appBar: LiquidAppBar(
+        title: 'Risk Assessment',
+        subtitle: _assessment != null
+            ? _getRiskText(_assessment!.riskLevel)
+            : 'Analyzing…',
+        icon: Icons.shield_rounded,
+        showBackButton: true,
       ),
-      body: _isAssessing
-          ? _buildLoadingState()
-          : _error != null
-              ? _buildErrorState()
-              : _buildAssessmentResults(),
+      body: Stack(
+        children: [
+          const LiquidBackground(),
+          _isAssessing
+              ? _buildLoadingState()
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildAssessmentResults(),
+        ],
+      ),
     );
   }
 
@@ -305,9 +313,11 @@ class _AIPoisoningAssessmentScreenState
 
   Widget _buildAssessmentResults() {
     if (_assessment == null) return const SizedBox();
+    final topInset = MediaQuery.of(context).padding.top;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(16, topInset + 132, 16, 32),
       children: [
         // Risk Level Banner
         _buildRiskBanner(),
@@ -595,25 +605,27 @@ class _AIPoisoningAssessmentScreenState
   }
 
   Widget _buildConfidenceBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [PawfectColors.cardShadow],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.verified, color: PawfectColors.pawfectOrange, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            'AI Confidence: ${_assessment!.confidenceScore}%',
-            style: PawfectTextStyles.bodyMedium.copyWith(
-              fontWeight: FontWeight.bold,
+    return Center(
+      child: GlassPill(
+        tintOpacity: 0.7,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.verified_rounded,
+              color: PawfectColors.pawfectOrange,
+              size: 18,
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              'AI Confidence: ${_assessment!.confidenceScore}%',
+              style: PawfectTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -622,17 +634,21 @@ class _AIPoisoningAssessmentScreenState
     required String title,
     required List<Widget> children,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [PawfectColors.cardShadow],
-      ),
+    return GlassCard(
+      radius: 22,
+      blur: 16,
+      tintOpacity: 0.55,
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: PawfectTextStyles.h5),
+          Text(
+            title,
+            style: PawfectTextStyles.h5.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+            ),
+          ),
           const SizedBox(height: 12),
           ...children,
         ],

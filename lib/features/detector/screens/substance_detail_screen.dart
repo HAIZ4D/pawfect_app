@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/liquid_background.dart';
 import '../../../models/toxic_substance_model.dart';
 import 'report_poisoning_incident_screen.dart';
 
@@ -31,7 +33,10 @@ class SubstanceDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: PawfectColors.pawfectCream,
-      body: CustomScrollView(
+      body: Stack(
+        children: [
+          const LiquidBackground(),
+          CustomScrollView(
         slivers: [
           // App Bar with substance name
           SliverAppBar(
@@ -71,6 +76,7 @@ class SubstanceDetailScreen extends StatelessWidget {
 
           SliverList(
             delegate: SliverChildListDelegate([
+              const SizedBox(height: 8),
               // Emergency Alert
               if (isEmergency) _buildEmergencyAlert(toxicityColor),
 
@@ -127,6 +133,8 @@ class SubstanceDetailScreen extends StatelessWidget {
           ),
         ],
       ),
+        ],
+      ),
       bottomNavigationBar: _buildEmergencyButtons(context),
     );
   }
@@ -180,15 +188,14 @@ class SubstanceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildUrgencyCard(Color color) {
-    return Container(
-      margin: const EdgeInsets.all(16),
+    return Padding(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [PawfectColors.cardShadow],
-      ),
-      child: Column(
+      child: GlassCard(
+        radius: 22,
+        blur: 16,
+        tintOpacity: 0.55,
+        padding: const EdgeInsets.all(18),
+        child: Column(
         children: [
           Row(
             children: [
@@ -266,6 +273,7 @@ class SubstanceDetailScreen extends StatelessWidget {
             ),
         ],
       ),
+      ),
     );
   }
 
@@ -275,15 +283,14 @@ class SubstanceDetailScreen extends StatelessWidget {
     required String content,
     required Color color,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [PawfectColors.cardShadow],
-      ),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: GlassCard(
+        radius: 22,
+        blur: 16,
+        tintOpacity: 0.55,
+        padding: const EdgeInsets.all(18),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -300,6 +307,7 @@ class SubstanceDetailScreen extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -309,15 +317,14 @@ class SubstanceDetailScreen extends StatelessWidget {
     required List<String> items,
     required Color color,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [PawfectColors.cardShadow],
-      ),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: GlassCard(
+        radius: 22,
+        blur: 16,
+        tintOpacity: 0.55,
+        padding: const EdgeInsets.all(18),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -364,19 +371,19 @@ class SubstanceDetailScreen extends StatelessWidget {
               ),
         ],
       ),
+      ),
     );
   }
 
   Widget _buildAlternativeNames() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [PawfectColors.cardShadow],
-      ),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: GlassCard(
+        radius: 22,
+        blur: 16,
+        tintOpacity: 0.55,
+        padding: const EdgeInsets.all(18),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -406,6 +413,7 @@ class SubstanceDetailScreen extends StatelessWidget {
             }).toList(),
           ),
         ],
+      ),
       ),
     );
   }

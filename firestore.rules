@@ -1,0 +1,88 @@
+rules_version = '2';
+
+// Pawfect Firestore security rules.
+//
+// Every authenticated user can read and write only the documents they
+// own:
+//   • users/{uid}           — their own profile doc
+//   • pets/{petId}          — pets where doc.userId == request.auth.uid
+//   • diagnoses/{id}        — diagnoses where doc.userId == request.auth.uid
+//   • poisoning_incidents/{id} — incidents where doc.userId == request.auth.uid
+//
+// poisons/* is the global toxic-substance reference list — readable by
+// any authenticated user, never writable from the app.
+//
+// Anything not matched below is denied by default (rules_version 2).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ─────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function ownsResource() {
+      return isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    function ownsIncoming() {
+      return isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ─── User profiles ──────────────────────────────────────────
+    // A user can read, create, update, or delete only their own
+    // user document.
+    match /users/{uid} {
+      allow read, create, update, delete: if isOwner(uid);
+    }
+
+    // ─── Pets ────────────────────────────────────────────────────
+    // Each pet doc has a `userId` field set to the owner's uid.
+    // Owner has full access. Others get nothing.
+    match /pets/{petId} {
+      allow read, update, delete: if ownsResource();
+      allow create: if ownsIncoming();
+    }
+
+    // ─── Diagnoses (illness detector results) ────────────────────
+    match /diagnoses/{diagnosisId} {
+      allow read, update, delete: if ownsResource();
+      allow create: if ownsIncoming();
+    }
+
+    // ─── Poisoning incidents ─────────────────────────────────────
+    match /poisoning_incidents/{incidentId} {
+      allow read, update, delete: if ownsResource();
+      allow create: if ownsIncoming();
+    }
+
+    // ─── Reminders (Today strip) ─────────────────────────────────
+    // Care reminders (vaccinations, medications, vet visits, etc.)
+    // owned by the user.
+    match /reminders/{reminderId} {
+      allow read, update, delete: if ownsResource();
+      allow create: if ownsIncoming();
+    }
+
+    // ─── Weight records (Trend chart) ────────────────────────────
+    match /weight_records/{recordId} {
+      allow read, update, delete: if ownsResource();
+      allow create: if ownsIncoming();
+    }
+
+    // ─── Poison reference database (read-only) ───────────────────
+    // Curated list of toxic substances. The app reads it; writes
+    // are admin-only and happen outside the app (Firebase console
+    // or a script).
+    match /poisons/{poisonId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+  }
+}

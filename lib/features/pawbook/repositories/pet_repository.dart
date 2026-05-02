@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../models/pet_model.dart';
 import '../../../core/utils/image_processor.dart';
 
@@ -8,9 +9,19 @@ import '../../../core/utils/image_processor.dart';
 class PetRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Default user ID (no authentication required)
-  /// All users share the same data for simplicity
-  String get _currentUserId => 'default_user';
+  /// UID of the currently signed-in user. Throws if nobody is signed in
+  /// — the AuthGate prevents home-screen flows from being reached
+  /// without auth, so a null here is a programmer error worth surfacing.
+  String get _currentUserId {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      throw StateError(
+        'PetRepository accessed without a signed-in user. '
+        'Ensure AuthGate has authenticated the user before calling.',
+      );
+    }
+    return uid;
+  }
 
   /// Reference to the pets collection
   CollectionReference get _petsCollection => _firestore.collection('pets');

@@ -106,4 +106,26 @@ class PawfectColors {
   // 🔲 BORDERS
   static const Color border = Color(0x33000000); // Black at 20% opacity
   static const Color borderLight = Color(0x1A000000); // Black at 10% opacity
+
+  // 🧊 LIQUID GLASS TOKENS
+  /// Glass surfaces sit on top of the LiquidBackground orbs. These
+  /// tokens are the standard tint/border/shadow values used by GlassCard
+  /// and the screens that compose with it.
+  static const Color frostHigh = Color(0xB3FFFFFF); // 70% white — primary
+  static const Color frostMid = Color(0x99FFFFFF); // 60% white — secondary
+  static const Color frostLow = Color(0x66FFFFFF); // 40% white — pills/chips
+  static const Color frostBorder = Color(0x99FFFFFF); // 60% white border
+  static const Color frostStroke = Color(0x4DFFFFFF); // 30% inner highlight
+  static const Color frostShadow = Color(0x14000000); // soft drop shadow
+
+  /// Premium ink tokens (dark text + hero gradients on glass screens)
+  static const Color ink = Color(0xFF2D3142);
+  static const Color inkSoft = Color(0xFF5A5F72);
+  static const Color hairline = Color(0x14000000);
+
+  /// Premium pastel accents (used by hero badges and orb tints)
+  static const Color peach = Color(0xFFFFEAD5);
+  static const Color mint = Color(0xFFD9F2E6);
+  static const Color sky = Color(0xFFDCE9FF);
+  static const Color rose = Color(0xFFFFDCE3);
 }

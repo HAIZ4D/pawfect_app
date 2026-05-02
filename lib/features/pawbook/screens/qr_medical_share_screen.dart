@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../../core/widgets/liquid_app_bar.dart';
+import '../../../core/widgets/liquid_background.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -151,39 +153,55 @@ class _QrMedicalShareScreenState extends State<QrMedicalShareScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Share Medical Profile',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: PawfectColors.pawfectOrange,
-        foregroundColor: Colors.white,
-        elevation: 0,
+      extendBodyBehindAppBar: true,
+      backgroundColor: PawfectColors.pawfectCream,
+      appBar: LiquidAppBar(
+        title: 'Share Medical',
+        subtitle: 'Vet-ready QR profile',
+        icon: Icons.qr_code_2_rounded,
+        showBackButton: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: _shareQrCode,
-            tooltip: 'Share QR Code',
+          GestureDetector(
+            onTap: _shareQrCode,
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ),
+              child: const Icon(
+                Icons.ios_share_rounded,
+                size: 18,
+                color: Color(0xFF2D3142),
+              ),
+            ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _buildInfoCard(),
-            const SizedBox(height: 20),
-            _buildQrCodeCard(),
-            const SizedBox(height: 20),
-            _buildInstructionsCard(),
-          ],
-        ),
+      body: Stack(
+        children: [
+          const LiquidBackground(),
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, topInset + 132, 20, 32),
+            child: Column(
+              children: [
+                _buildInfoCard(),
+                const SizedBox(height: 20),
+                _buildQrCodeCard(),
+                const SizedBox(height: 20),
+                _buildInstructionsCard(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

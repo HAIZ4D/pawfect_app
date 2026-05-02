@@ -52,11 +52,6 @@ class AppConstants {
   static const String durationHours = 'hours';
   static const String durationDays = 'days';
 
-  // ML Model
-  static const String mlModelPath = 'assets/ml_models/pet_illness_detector.tflite';
-  static const int mlInputSize = 224;
-  static const double mlConfidenceThreshold = 0.6;
-
   // Image Settings
   static const int maxImageSizeKB = 500;
   static const int imageQuality = 85;
@@ -69,7 +64,6 @@ class AppConstants {
 
   // Timeouts
   static const Duration networkTimeout = Duration(seconds: 30);
-  static const Duration mlInferenceTimeout = Duration(milliseconds: 500);
 
   // Medical Disclaimer
   static const String medicalDisclaimer = '''
@@ -79,7 +73,7 @@ Pawfect is an informational tool designed to assist pet owners in monitoring the
 
 In case of emergency, contact your veterinarian or emergency animal hospital immediately.
 
-The AI-powered illness detector provides preliminary assessments based on visual analysis and symptom patterns. These assessments are not definitive diagnoses and should be confirmed by a veterinary professional.
+The AI-powered illness detector uses Gemini 2.5 Flash to provide preliminary assessments based on image analysis and symptom patterns. These assessments are not definitive diagnoses and should be confirmed by a veterinary professional.
 
 By using this app, you acknowledge that you understand its limitations and agree to seek appropriate veterinary care for your pet.
 ''';

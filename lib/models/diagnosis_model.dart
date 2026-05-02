@@ -15,9 +15,9 @@ class DiagnosisModel {
   final String firstAidInstructions; // Immediate care instructions
   final String vetReport; // Professional vet-ready report
 
-  // ML image analysis results
-  final List<String> mlDetections; // Conditions detected by TensorFlow Lite
-  final String? mlAnalysis; // ML model analysis summary
+  // Visual analysis results (from Gemini 2.5 Flash multimodal vision)
+  final List<String> mlDetections; // Conditions detected from the photo
+  final String? mlAnalysis; // Vision analysis summary
 
   // Risk assessment
   final List<String> riskFactors; // Identified risk factors

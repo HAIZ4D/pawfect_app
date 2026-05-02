@@ -46,13 +46,9 @@ class PetProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _setError(null);
-
-      print('🔵 Loading pets...');
       _pets = await _repository.getUserPets();
-      print('🟢 Loaded ${_pets.length} pets');
       notifyListeners();
     } catch (e) {
-      print('🔴 Error loading pets: ${e.toString()}');
       _setError('Failed to load pets: ${e.toString()}');
     } finally {
       _setLoading(false);

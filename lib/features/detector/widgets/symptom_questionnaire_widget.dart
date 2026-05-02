@@ -4,7 +4,6 @@ import '../../../models/symptom_model.dart';
 import '../data/symptoms_database.dart';
 
 /// Dynamic symptom questionnaire widget
-/// Allows users to select symptoms from categorized list
 class SymptomQuestionnaireWidget extends StatefulWidget {
   final Function(List<SymptomModel>) onSymptomsChanged;
   final List<SymptomModel>? initialSymptoms;
@@ -25,6 +24,11 @@ class _SymptomQuestionnaireWidgetState
   final List<SymptomModel> _selectedSymptoms = [];
   String? _selectedCategory;
 
+  static const Color _ink = Color(0xFF2D3142);
+  static const Color _inkSoft = Color(0xFF5A5F72);
+  static const Color _hairline = Color(0x14000000);
+  static const Color _peach = Color(0xFFFFEAD5);
+
   @override
   void initState() {
     super.initState();
@@ -39,49 +43,91 @@ class _SymptomQuestionnaireWidgetState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildCategoryFilter(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         _buildSymptomsList(),
       ],
     );
   }
 
-  /// Category filter chips
+  // ─────────────────────────── Category filter ───────────────────────────
   Widget _buildCategoryFilter() {
     final categories = SymptomsDatabase.getAllCategories();
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        FilterChip(
-          label: const Text('All'),
-          selected: _selectedCategory == null,
-          onSelected: (selected) {
-            setState(() {
-              _selectedCategory = null;
-            });
-          },
-          selectedColor: PawfectColors.pawfectOrange.withOpacity(0.3),
-          checkmarkColor: PawfectColors.pawfectOrange,
-        ),
-        ...categories.map((category) {
-          return FilterChip(
-            label: Text(category),
-            selected: _selectedCategory == category,
-            onSelected: (selected) {
-              setState(() {
-                _selectedCategory = selected ? category : null;
-              });
-            },
-            selectedColor: PawfectColors.pawfectOrange.withOpacity(0.3),
-            checkmarkColor: PawfectColors.pawfectOrange,
-          );
-        }),
-      ],
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          _categoryChip(label: 'All', category: null, icon: Icons.apps_rounded),
+          const SizedBox(width: 8),
+          ...categories.expand((c) => [
+                _categoryChip(
+                  label: c,
+                  category: c,
+                  icon: _getCategoryIcon(c),
+                ),
+                const SizedBox(width: 8),
+              ]),
+        ],
+      ),
     );
   }
 
-  /// Symptoms list with checkboxes
+  Widget _categoryChip({
+    required String label,
+    required String? category,
+    required IconData icon,
+  }) {
+    final isSelected = _selectedCategory == category;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategory = category),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? _ink : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? _ink : _hairline,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: _ink.withOpacity(0.22),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected
+                  ? PawfectColors.pawfectOrange
+                  : _inkSoft,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? Colors.white : _ink,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────── Symptoms list ───────────────────────────
   Widget _buildSymptomsList() {
     final symptoms = _selectedCategory != null
         ? SymptomsDatabase.getSymptomsByCategory(_selectedCategory!)
@@ -93,137 +139,214 @@ class _SymptomQuestionnaireWidgetState
           padding: EdgeInsets.all(20.0),
           child: Text(
             'No symptoms available',
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(color: _inkSoft),
           ),
         ),
       );
     }
 
-    // Group by category if showing all
     if (_selectedCategory == null) {
       final categories = SymptomsDatabase.getAllCategories();
       return Column(
-        children: categories.map((category) {
-          final categorySymptoms =
-              SymptomsDatabase.getSymptomsByCategory(category);
-          return _buildCategorySection(category, categorySymptoms);
-        }).toList(),
+        children: categories
+            .map((category) => _buildCategorySection(
+                  category,
+                  SymptomsDatabase.getSymptomsByCategory(category),
+                ))
+            .toList(),
       );
     }
 
-    // Show single category
-    return _buildSymptomItems(symptoms);
+    return _buildSymptomChips(symptoms);
   }
 
-  /// Category section with expandable list
   Widget _buildCategorySection(
     String category,
     List<SymptomModel> symptoms,
   ) {
-    final selectedCount =
-        symptoms.where((s) => _isSymptomSelected(s)).length;
+    final selectedCount = symptoms.where(_isSymptomSelected).length;
 
-    return ExpansionTile(
-      title: Row(
-        children: [
-          _getCategoryIcon(category),
-          const SizedBox(width: 8),
-          Text(
-            category,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: PawfectColors.pawfectCream.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _hairline),
+        ),
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
           ),
-          if (selectedCount > 0) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: PawfectColors.pawfectOrange,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '$selectedCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+            childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            iconColor: _inkSoft,
+            collapsedIconColor: _inkSoft,
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    _getCategoryIcon(category),
+                    size: 16,
+                    color: PawfectColors.pawfectOrange,
+                  ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    category,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: _ink,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                ),
+                if (selectedCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: PawfectColors.pawfectOrange,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$selectedCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            children: [_buildSymptomChips(symptoms)],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSymptomChips(List<SymptomModel> symptoms) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: symptoms.map(_buildSymptomChip).toList(),
+    );
+  }
+
+  Widget _buildSymptomChip(SymptomModel symptom) {
+    final isSelected = _isSymptomSelected(symptom);
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedSymptoms.removeWhere((s) => s.id == symptom.id);
+          } else {
+            _selectedSymptoms.add(symptom);
+          }
+        });
+        widget.onSymptomsChanged(_selectedSymptoms);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? PawfectColors.pawfectOrange : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? PawfectColors.pawfectOrange
+                : _hairline,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: PawfectColors.pawfectOrange.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected
+                    ? Colors.white
+                    : Colors.transparent,
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.white
+                      : _inkSoft.withOpacity(0.35),
+                  width: 1.5,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 11,
+                      color: PawfectColors.pawfectOrange,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 7),
+            Text(
+              symptom.name,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? Colors.white : _ink,
+                letterSpacing: 0.1,
               ),
             ),
           ],
-        ],
+        ),
       ),
-      children: [
-        _buildSymptomItems(symptoms),
-      ],
     );
   }
 
-  /// Symptom items with checkboxes
-  Widget _buildSymptomItems(List<SymptomModel> symptoms) {
-    return Column(
-      children: symptoms.map((symptom) {
-        final isSelected = _isSymptomSelected(symptom);
-
-        return CheckboxListTile(
-          title: Text(symptom.name),
-          subtitle: symptom.description != null
-              ? Text(
-                  symptom.description!,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                )
-              : null,
-          value: isSelected,
-          activeColor: PawfectColors.pawfectOrange,
-          onChanged: (bool? value) {
-            setState(() {
-              if (value == true) {
-                _selectedSymptoms.add(symptom);
-              } else {
-                _selectedSymptoms.removeWhere((s) => s.id == symptom.id);
-              }
-            });
-            widget.onSymptomsChanged(_selectedSymptoms);
-          },
-        );
-      }).toList(),
-    );
-  }
-
-  /// Check if symptom is selected
   bool _isSymptomSelected(SymptomModel symptom) {
     return _selectedSymptoms.any((s) => s.id == symptom.id);
   }
 
-  /// Get category icon
-  Icon _getCategoryIcon(String category) {
-    IconData iconData;
-
+  IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
       case 'behavioral':
-        iconData = Icons.psychology;
-        break;
+        return Icons.psychology_rounded;
       case 'digestive':
-        iconData = Icons.restaurant;
-        break;
+        return Icons.restaurant_rounded;
       case 'respiratory':
-        iconData = Icons.air;
-        break;
+        return Icons.air_rounded;
       case 'skin & coat':
-        iconData = Icons.pets;
-        break;
+        return Icons.pets_rounded;
       case 'urinary':
-        iconData = Icons.water_drop;
-        break;
+        return Icons.water_drop_rounded;
       case 'neurological':
-        iconData = Icons.psychology;
-        break;
+        return Icons.auto_awesome_rounded;
       case 'physical':
-        iconData = Icons.accessibility_new;
-        break;
+        return Icons.accessibility_new_rounded;
       default:
-        iconData = Icons.medical_services;
+        return Icons.medical_services_rounded;
     }
-
-    return Icon(iconData, size: 20, color: PawfectColors.pawfectOrange);
   }
 }

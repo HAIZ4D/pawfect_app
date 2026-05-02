@@ -70,54 +70,34 @@ class AuthRepository {
     }
   }
 
-  /// Sign in with Google
+  /// Sign in with Google.
+  ///
+  /// Note: requires the Android SHA-1 fingerprint of your debug/release
+  /// keystore to be registered in the Firebase console (Project Settings →
+  /// your Android app → Add fingerprint), otherwise [signInWithCredential]
+  /// returns an `invalid-credential` error.
   Future<UserCredential> signInWithGoogle() async {
     try {
-      print('🔵 Starting Google Sign-In...');
-
-      // Trigger Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
       if (googleUser == null) {
-        print('🔴 Google sign-in cancelled by user');
-        throw Exception('Google sign-in cancelled by user');
+        throw Exception('Google sign-in cancelled');
       }
 
-      print('🔵 Google account selected: ${googleUser.email}');
-
-      // Obtain auth details
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      print('🔵 Got Google auth tokens');
-
-      // Create credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      print('🔵 Signing in to Firebase...');
-
-      // Sign in to Firebase
       final userCredential = await _auth.signInWithCredential(credential);
-
-      print('🟢 Firebase sign-in successful!');
-
-      // Create or update user document
       if (userCredential.user != null) {
-        print('🔵 Creating/updating user document...');
         await _createOrUpdateUserDocument(userCredential.user!);
-        print('🟢 User document created/updated');
       }
-
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print('🔴 Firebase Auth Error: ${e.code} - ${e.message}');
       throw _handleAuthException(e);
-    } catch (e) {
-      print('🔴 Google Sign-In Error: ${e.toString()}');
-      rethrow;
     }
   }
 
@@ -206,15 +186,14 @@ class AuthRepository {
     }
   }
 
-  /// Update last login time
+  /// Update last login time. Best-effort — never blocks the auth flow.
   Future<void> _updateLastLoginTime(String uid) async {
     try {
       await _firestore.collection('users').doc(uid).update({
         'lastLoginAt': Timestamp.fromDate(DateTime.now()),
       });
-    } catch (e) {
-      // Silently fail - not critical
-      print('Failed to update last login time: $e');
+    } catch (_) {
+      // Silent — not critical for UX.
     }
   }
 

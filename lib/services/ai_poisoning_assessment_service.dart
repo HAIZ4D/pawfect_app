@@ -10,7 +10,7 @@ class AIPoisoningAssessmentService {
   AIPoisoningAssessmentService() {
     final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
     _model = GenerativeModel(
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       apiKey: apiKey,
     );
   }

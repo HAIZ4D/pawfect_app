@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/colors.dart';
-import '../../../core/constants/text_styles.dart';
+import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/liquid_background.dart';
 import '../../../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
@@ -21,6 +22,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
 
+  static const Color _ink = Color(0xFF2D3142);
+  static const Color _inkSoft = Color(0xFF5A5F72);
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -30,63 +34,53 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleEmailLogin() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProvider.signInWithEmailPassword(
       email: _emailController.text.trim(),
       password: _passwordController.text,
     );
-
+    if (!mounted) return;
     setState(() => _isLoading = false);
-
-    if (mounted) {
-      if (success) {
-        // Navigate to home screen (will be implemented later)
-        Navigator.of(context).pushReplacementNamed('/home');
-      } else {
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              authProvider.errorMessage ?? 'Login failed. Please try again.',
-              style: PawfectTextStyles.bodyMedium.copyWith(color: Colors.white),
-            ),
-            backgroundColor: PawfectColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+    if (success) {
+      // AuthGate at the root will rebuild to HomeScreen — pop everything
+      // we pushed on top of it (this LoginScreen + the OnboardingScreen).
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      _showSnack(authProvider.errorMessage ?? 'Login failed. Please try again.');
     }
   }
 
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
-
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProvider.signInWithGoogle();
-
+    if (!mounted) return;
     setState(() => _isLoading = false);
-
-    if (mounted) {
-      if (success) {
-        // Navigate to home screen
-        Navigator.of(context).pushReplacementNamed('/home');
-      } else {
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              authProvider.errorMessage ?? 'Google Sign-In failed. Please try again.',
-              style: PawfectTextStyles.bodyMedium.copyWith(color: Colors.white),
-            ),
-            backgroundColor: PawfectColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
+    if (success) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      final msg = authProvider.errorMessage ?? '';
+      // Silent on user cancellation.
+      if (!msg.toLowerCase().contains('cancel')) {
+        _showSnack(
+          msg.isEmpty ? 'Google Sign-In failed. Please try again.' : msg,
         );
       }
     }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFD32F2F),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _navigateToRegister() {
@@ -104,32 +98,66 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: PawfectColors.primaryGradient,
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo and Title
-                  _buildHeader(),
-                  const SizedBox(height: 48),
+      backgroundColor: PawfectColors.pawfectCream,
+      body: Stack(
+        children: [
+          const LiquidBackground(),
+          SafeArea(
+            child: Column(
+              children: [
+                _buildBackBar(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: 24),
+                        _buildLoginCard(),
+                        const SizedBox(height: 22),
+                        _buildRegisterLink(),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                  // Login Form Card
-                  _buildLoginCard(),
-                  const SizedBox(height: 24),
-
-                  // Register Link
-                  _buildRegisterLink(),
-                ],
+  Widget _buildBackBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.65),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.7),
+                  width: 1.2,
+                ),
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: _ink,
+                size: 16,
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -137,44 +165,32 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        // Paw Icon
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: [PawfectColors.elevatedShadow],
-          ),
-          child: const Icon(
-            Icons.pets,
-            size: 48,
-            color: PawfectColors.pawfectOrange,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Title
-        Text(
-          'Welcome to Pawfect',
-          style: PawfectTextStyles.h1.copyWith(
-            color: Colors.white,
-            shadows: [
-              const Shadow(
-                offset: Offset(0, 2),
-                blurRadius: 4,
-                color: Colors.black26,
-              ),
-            ],
-          ),
+        Image.asset(
+          'assets/images/pawfect-logo.png',
+          width: 300,
+          fit: BoxFit.contain,
         ),
         const SizedBox(height: 8),
-
-        // Subtitle
+        const Text(
+          'Welcome back',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: _ink,
+            letterSpacing: -0.6,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 6),
         Text(
-          'Your Pet\'s Healthcare Companion',
-          style: PawfectTextStyles.bodyLarge.copyWith(
-            color: Colors.white.withOpacity(0.9),
+          "Sign in to keep your companion's care\non the right path.",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            color: _inkSoft,
+            fontWeight: FontWeight.w500,
+            height: 1.5,
           ),
         ),
       ],
@@ -182,168 +198,270 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLoginCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [PawfectColors.cardShadow],
-      ),
-      padding: const EdgeInsets.all(24),
+    return GlassCard(
+      radius: 28,
+      blur: 22,
+      tintOpacity: 0.6,
+      padding: const EdgeInsets.all(22),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Email Field
-            TextFormField(
+            _buildFieldLabel('Email'),
+            const SizedBox(height: 8),
+            _glassField(
               controller: _emailController,
+              hint: 'you@example.com',
+              icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               validator: Validators.email,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                hintText: 'Enter your email',
-                prefixIcon: const Icon(Icons.email_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: PawfectColors.pawfectOrange,
-                    width: 2,
-                  ),
-                ),
-              ),
             ),
-            const SizedBox(height: 16),
-
-            // Password Field
-            TextFormField(
+            const SizedBox(height: 14),
+            _buildFieldLabel('Password'),
+            const SizedBox(height: 8),
+            _glassField(
               controller: _passwordController,
-              obscureText: _obscurePassword,
+              hint: 'Your secret',
+              icon: Icons.lock_outline_rounded,
+              obscure: _obscurePassword,
               textInputAction: TextInputAction.done,
               validator: Validators.password,
-              onFieldSubmitted: (_) => _handleEmailLogin(),
-              decoration: InputDecoration(
-                labelText: 'Password',
-                hintText: 'Enter your password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                  ),
-                  onPressed: () {
-                    setState(() => _obscurePassword = !_obscurePassword);
-                  },
+              onSubmitted: (_) => _handleEmailLogin(),
+              suffix: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: _inkSoft,
+                  size: 20,
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: PawfectColors.pawfectOrange,
-                    width: 2,
-                  ),
+                onPressed: () => setState(
+                  () => _obscurePassword = !_obscurePassword,
                 ),
               ),
             ),
             const SizedBox(height: 8),
-
-            // Forgot Password Link
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: _navigateToForgotPassword,
-                child: Text(
-                  'Forgot Password?',
-                  style: PawfectTextStyles.bodyMedium.copyWith(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'Forgot password?',
+                  style: TextStyle(
+                    fontSize: 12.5,
                     color: PawfectColors.pawfectOrange,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
+            _primaryButton(),
+            const SizedBox(height: 18),
+            _orDivider(),
+            const SizedBox(height: 16),
+            _googleButton(),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // Login Button
-            ElevatedButton(
-              onPressed: _isLoading ? null : _handleEmailLogin,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: PawfectColors.pawfectOrange,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 2,
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Text(
-                      'Login',
-                      style: PawfectTextStyles.button,
-                    ),
+  Widget _buildFieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          color: _inkSoft,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _glassField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+    TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+    String? Function(String?)? validator,
+    Widget? suffix,
+    void Function(String)? onSubmitted,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.7),
+          width: 1.2,
+        ),
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscure,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        validator: validator,
+        onFieldSubmitted: onSubmitted,
+        style: const TextStyle(
+          fontSize: 14,
+          color: _ink,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(
+            color: _inkSoft,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: PawfectColors.pawfectOrange,
+            size: 20,
+          ),
+          suffixIcon: suffix,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _primaryButton() {
+    return GestureDetector(
+      onTap: _isLoading ? null : _handleEmailLogin,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              PawfectColors.pawfectOrange,
+              Color(0xFFFFB347),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: PawfectColors.pawfectOrange.withOpacity(0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
-            const SizedBox(height: 24),
-
-            // Divider
-            Row(
-              children: [
-                Expanded(child: Divider(color: Colors.grey.shade300)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'OR',
-                    style: PawfectTextStyles.bodySmall.copyWith(
-                      color: Colors.grey.shade600,
-                    ),
+          ],
+        ),
+        child: Center(
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text(
+                  'Sign In',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 0.4,
                   ),
                 ),
-                Expanded(child: Divider(color: Colors.grey.shade300)),
-              ],
-            ),
-            const SizedBox(height: 24),
+        ),
+      ),
+    );
+  }
 
-            // Google Sign-In Button
-            OutlinedButton.icon(
-              onPressed: _isLoading ? null : _handleGoogleSignIn,
-              icon: Image.asset(
-                'assets/images/google_logo.png',
-                height: 24,
-                width: 24,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.g_mobiledata, size: 24);
-                },
-              ),
-              label: Text(
-                'Continue with Google',
-                style: PawfectTextStyles.bodyLarge.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(color: Colors.grey.shade300, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+  Widget _orDivider() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: Colors.white.withOpacity(0.5),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'or',
+            style: TextStyle(
+              fontSize: 11,
+              color: _inkSoft,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: Colors.white.withOpacity(0.5),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _googleButton() {
+    return GestureDetector(
+      onTap: _isLoading ? null : _handleGoogleSignIn,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.65),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.7),
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/google_logo.png',
+              height: 20,
+              width: 20,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.g_mobiledata, size: 22, color: _ink);
+              },
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Continue with Google',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _ink,
+                letterSpacing: 0.2,
               ),
             ),
           ],
@@ -356,24 +474,22 @@ class _LoginScreenState extends State<LoginScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          'Don\'t have an account? ',
-          style: PawfectTextStyles.bodyMedium.copyWith(
-            color: Colors.white.withOpacity(0.9),
+        const Text(
+          "Don't have an account? ",
+          style: TextStyle(
+            fontSize: 13,
+            color: _inkSoft,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        TextButton(
-          onPressed: _navigateToRegister,
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-          ),
-          child: Text(
-            'Register',
-            style: PawfectTextStyles.bodyMedium.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              decoration: TextDecoration.underline,
-              decorationColor: Colors.white,
+        GestureDetector(
+          onTap: _navigateToRegister,
+          child: const Text(
+            'Sign Up',
+            style: TextStyle(
+              fontSize: 13,
+              color: PawfectColors.pawfectOrange,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),

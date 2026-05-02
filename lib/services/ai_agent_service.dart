@@ -3,27 +3,22 @@ import '../models/pet_model.dart';
 import '../models/symptom_model.dart';
 import '../models/diagnosis_model.dart';
 import 'gemini_service.dart';
-import 'ml_inference_service.dart';
 
 /// AI Agent Decision Engine
-/// Combines ML image analysis + symptom data + Gemini AI
-/// to provide comprehensive illness detection and recommendations
+/// Combines Gemini multimodal image analysis + symptom data
+/// to provide comprehensive illness detection and recommendations.
 class AIAgentService {
   final GeminiService _geminiService;
-  final MLInferenceService _mlService;
 
-  AIAgentService({
-    required GeminiService geminiService,
-    required MLInferenceService mlService,
-  })  : _geminiService = geminiService,
-        _mlService = mlService;
+  AIAgentService({required GeminiService geminiService})
+      : _geminiService = geminiService;
 
   /// Main diagnosis method - combines all AI components
   ///
   /// This is the core decision engine that:
-  /// 1. Analyzes image with TensorFlow Lite (if provided)
+  /// 1. Analyzes image with Gemini vision (if provided)
   /// 2. Processes symptoms
-  /// 3. Uses Gemini AI to combine results
+  /// 3. Uses Gemini to combine results into a structured diagnosis
   /// 4. Calculates urgency level
   /// 5. Generates recommendations
   Future<DiagnosisModel> diagnose({
@@ -32,19 +27,19 @@ class AIAgentService {
     PetModel? pet,
   }) async {
     try {
-      print('🤖 AI Agent: Starting diagnosis...');
-      print('📋 Symptoms: ${symptoms.length}');
-      print('📸 Image: ${image != null ? 'Provided' : 'Not provided'}');
-      print('🐾 Pet: ${pet?.name ?? 'Not specified'}');
+      print('AI Agent: Starting diagnosis...');
+      print('Symptoms: ${symptoms.length}');
+      print('Image: ${image != null ? 'Provided' : 'Not provided'}');
+      print('Pet: ${pet?.name ?? 'Not specified'}');
 
-      // Step 1: Analyze image with ML model (if provided)
+      // Step 1: Analyze image with Gemini vision (if provided)
       Map<String, dynamic>? mlResults;
-      if (image != null && _mlService.isInitialized) {
-        print('🔄 Step 1: Running ML image analysis...');
-        mlResults = await _mlService.analyzeImage(image);
-        print('✅ ML analysis complete: ${mlResults['detectedConditions']}');
+      if (image != null && _geminiService.isInitialized) {
+        print('Step 1: Running Gemini vision analysis...');
+        mlResults = await _geminiService.analyzeImage(image, pet: pet);
+        print('Vision analysis complete: ${mlResults['detectedConditions']}');
       } else {
-        print('⏭️  Step 1: Skipping ML analysis (no image or model not loaded)');
+        print('Step 1: Skipping image analysis (no image provided)');
       }
 
       // Step 2: Use Gemini AI to analyze condition
@@ -260,66 +255,78 @@ class AIAgentService {
     return confidence.clamp(0.0, 1.0);
   }
 
-  /// Generate actionable recommendations
+  /// Generate actionable recommendations.
+  ///
+  /// Order:
+  ///   1. Gemini's condition-specific recommendations (most useful — these
+  ///      name the actual condition).
+  ///   2. ML-derived recommendations (only when image showed something).
+  ///   3. Urgency-tier boilerplate as a fallback so the list is never empty.
+  /// Duplicates are stripped case-insensitively while preserving order.
   List<String> _generateRecommendations({
     required String urgencyLevel,
     Map<String, dynamic>? aiAnalysis,
     Map<String, dynamic>? mlResults,
   }) {
-    final recommendations = <String>[];
+    final ordered = <String>[];
 
-    // Urgency-based recommendations
-    switch (urgencyLevel) {
-      case 'EMERGENCY':
-        recommendations.addAll([
-          'Seek immediate veterinary care',
-          'Call emergency vet before traveling',
-          'Keep pet calm during transport',
-        ]);
-        break;
-      case 'HIGH':
-        recommendations.addAll([
-          'Schedule vet appointment within 24 hours',
-          'Monitor symptoms closely',
-          'Take photos of visible symptoms',
-        ]);
-        break;
-      case 'MODERATE':
-        recommendations.addAll([
-          'Schedule vet appointment within 2-3 days',
-          'Monitor for worsening symptoms',
-          'Keep pet comfortable and hydrated',
-        ]);
-        break;
-      case 'LOW':
-        recommendations.addAll([
-          'Monitor symptoms over next few days',
-          'Schedule routine check-up if persistent',
-          'Maintain normal diet and routine',
-        ]);
-        break;
+    // 1. Gemini's specific recommendations lead.
+    if (aiAnalysis != null && aiAnalysis['recommendations'] is List) {
+      for (final rec in aiAnalysis['recommendations'] as List) {
+        final s = rec.toString().trim();
+        if (s.isNotEmpty) ordered.add(s);
+      }
     }
 
-    // Add AI-specific recommendations
-    if (aiAnalysis != null && aiAnalysis['recommendations'] != null) {
-      final aiRecs = aiAnalysis['recommendations'] as List<dynamic>;
-      recommendations.addAll(aiRecs.map((r) => r.toString()));
-    }
-
-    // Add ML-specific recommendations
+    // 2. ML-derived condition-specific recommendations.
     if (mlResults != null && mlResults['hasDetections'] == true) {
-      recommendations.add('Share captured image with veterinarian');
-
+      ordered.add('Share the captured photo with your veterinarian');
       final detections = mlResults['detectedConditions'] as List<dynamic>;
       if (detections.contains('Wound/Injury')) {
-        recommendations.add('Keep wound clean and prevent pet from licking');
+        ordered.add('Keep the wound clean and prevent your pet from licking it');
       }
       if (detections.contains('Parasites (Fleas/Ticks)')) {
-        recommendations.add('Isolate from other pets if possible');
+        ordered.add('Isolate from other pets and treat the home environment');
+      }
+      if (detections.contains('Eye Abnormality')) {
+        ordered.add('Avoid touching the eye and prevent rubbing or scratching');
+      }
+      if (detections.contains('Skin Infection')) {
+        ordered.add('Avoid bathing with regular shampoo until a vet advises');
       }
     }
 
-    return recommendations;
+    // 3. Urgency-tier boilerplate at the end (only adds what's missing).
+    final fallback = switch (urgencyLevel) {
+      'EMERGENCY' => const [
+          'Seek immediate veterinary care',
+          'Call the emergency vet before travelling',
+          'Keep your pet calm and still during transport',
+        ],
+      'HIGH' => const [
+          'Schedule a vet appointment within 24 hours',
+          'Monitor symptoms closely and note any changes',
+        ],
+      'MODERATE' => const [
+          'Schedule a vet appointment within 2–3 days',
+          'Keep your pet comfortable and well hydrated',
+        ],
+      'LOW' => const [
+          'Monitor symptoms over the next few days',
+          'Maintain normal diet and routine',
+        ],
+      _ => const <String>[],
+    };
+    ordered.addAll(fallback);
+
+    // Dedupe case-insensitively, preserving first occurrence.
+    final seen = <String>{};
+    final result = <String>[];
+    for (final r in ordered) {
+      final key = r.toLowerCase();
+      if (seen.add(key)) result.add(r);
+    }
+    return result;
   }
 
   /// Quick symptom-only analysis (when no image available)

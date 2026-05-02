@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/liquid_app_bar.dart';
+import '../../../core/widgets/liquid_background.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../models/pet_model.dart';
@@ -342,15 +344,27 @@ class _PoisoningIncidentsScreenState extends State<PoisoningIncidentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: PawfectColors.pawfectCream,
-      appBar: AppBar(
-        title: Text('Poisoning History', style: PawfectTextStyles.h3),
-        backgroundColor: PawfectColors.error,
-        foregroundColor: Colors.white,
+      appBar: const LiquidAppBar(
+        title: 'Poisoning History',
+        subtitle: 'Past incidents on file',
+        icon: Icons.shield_rounded,
+        showBackButton: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+      body: Stack(
+        children: [
+          const LiquidBackground(),
+          Padding(
+            padding: EdgeInsets.only(top: topInset + 132),
+            child: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: PawfectColors.pawfectOrange,
+              ),
+            )
           : _incidents.isEmpty
               ? Center(
                   child: Padding(
@@ -480,6 +494,9 @@ class _PoisoningIncidentsScreenState extends State<PoisoningIncidentsScreen> {
                     },
                   ),
                 ),
+          ),
+        ],
+      ),
     );
   }
 }
