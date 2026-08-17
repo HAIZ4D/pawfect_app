@@ -1,0 +1,77 @@
+%% Pawfect — data access layer
+%% Providers (state), repositories (Firestore), and which model each owns.
+
+classDiagram
+    direction TB
+
+    class AuthProvider {
+        +User user
+        +signIn()
+        +signOut()
+    }
+
+    class PetProvider {
+        +List~PetModel~ pets
+        +loadPets()
+        +addPet()
+    }
+
+    class AuthRepository {
+        +signIn()
+        +signUp()
+        +currentUser()
+    }
+
+    class PetRepository {
+        +loadPets()
+        +addPet()
+        +updatePet()
+        +deletePet()
+    }
+
+    class IllnessDetectorRepository {
+        +saveDiagnosis()
+        +listDiagnoses()
+    }
+
+    class PoisoningIncidentRepository {
+        +saveIncident()
+        +updateIncident()
+    }
+
+    class ChatRepository {
+        +createSession()
+        +appendMessage()
+        +streamMessages()
+    }
+
+    class WeightRepository {
+        +addRecord()
+        +streamRecords()
+    }
+
+    class RemindersRepository {
+        +addReminder()
+        +streamUpcoming()
+    }
+
+    %% Providers wrap repos
+    AuthProvider --> AuthRepository
+    PetProvider --> PetRepository
+
+    %% Each repo owns one domain
+    PetRepository ..> PetModel
+    IllnessDetectorRepository ..> DiagnosisModel
+    PoisoningIncidentRepository ..> PoisoningIncidentModel
+    ChatRepository ..> ChatSessionModel
+    ChatRepository ..> ChatMessageModel
+    WeightRepository ..> WeightRecordModel
+    RemindersRepository ..> ReminderModel
+
+    class PetModel
+    class DiagnosisModel
+    class PoisoningIncidentModel
+    class ChatSessionModel
+    class ChatMessageModel
+    class WeightRecordModel
+    class ReminderModel

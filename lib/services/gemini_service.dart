@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/pet_model.dart';
 import '../models/symptom_model.dart';
+import 'gemini_client.dart';
 
 /// Service for Gemini AI integration
 /// Handles multimodal image analysis, human-friendly explanations,
@@ -11,25 +12,20 @@ class GeminiService {
   late GenerativeModel _model;
   bool _initialized = false;
 
-  /// Initialize Gemini AI with API key
+  /// Initialize Gemini AI. The [apiKey] parameter is accepted for
+  /// historical reasons but ignored — the key is resolved centrally
+  /// from `.env` via [GeminiClient] so every service shares the same
+  /// referrer-injecting HTTP client.
   Future<void> initialize(String apiKey) async {
-    try {
-      _model = GenerativeModel(
-        model: 'gemini-2.5-flash',
-        apiKey: apiKey,
-        generationConfig: GenerationConfig(
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048,
-        ),
-      );
-      _initialized = true;
-      print('✅ Gemini AI initialized successfully');
-    } catch (e) {
-      print('❌ Error initializing Gemini AI: $e');
-      rethrow;
-    }
+    _model = GeminiClient.buildModel(
+      generationConfig: GenerationConfig(
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      ),
+    );
+    _initialized = true;
   }
 
   /// Check if Gemini is initialized

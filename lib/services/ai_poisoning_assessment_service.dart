@@ -1,21 +1,26 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 import '../models/pet_model.dart';
 import '../models/poison_substance_model.dart';
+import 'gemini_client.dart';
+import 'orchestration/agent_stage.dart';
+import 'orchestration/poisoning_orchestrator.dart';
 
 class AIPoisoningAssessmentService {
   late final GenerativeModel _model;
 
   AIPoisoningAssessmentService() {
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-    _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: apiKey,
-    );
+    _model = GeminiClient.buildModel();
   }
 
-  /// AI-powered poisoning risk assessment
+  /// Orchestrated risk assessment. Replaces the single prompt-and-pray
+  /// call with a five-agent pipeline (toxicology, symptom correlation,
+  /// timeline, critic, synthesis). The returned [PoisoningAssessmentResult]
+  /// shape is unchanged so UI and PDF generation work as-is.
+  ///
+  /// [progress] is an optional [ValueNotifier] the caller renders in a
+  /// multi-stage loading UI.
   Future<PoisoningAssessmentResult> assessPoisoningRisk({
     required String substanceName,
     required String substanceDescription,
@@ -23,84 +28,25 @@ class AIPoisoningAssessmentService {
     required List<String> symptoms,
     required String amountIngested,
     required Duration timeSinceIngestion,
+    ValueNotifier<OrchestrationProgress>? progress,
   }) async {
     try {
-      final prompt = '''
-You are a veterinary AI assistant specializing in pet poisoning emergencies. Analyze this poisoning incident and provide a comprehensive risk assessment.
-
-PET INFORMATION:
-- Name: ${pet.name}
-- Species: ${pet.species}
-- Breed: ${pet.breed ?? 'Unknown'}
-- Age: ${pet.getAge()}
-- Weight: ${pet.weight != null ? '${pet.weight} kg' : 'Unknown'}
-- Gender: ${pet.gender}
-
-SUBSTANCE INGESTED:
-- Name: $substanceName
-- Description: $substanceDescription
-- Amount: $amountIngested
-- Time Since Ingestion: ${timeSinceIngestion.inMinutes} minutes ago (${timeSinceIngestion.inHours} hours)
-
-OBSERVED SYMPTOMS:
-${symptoms.map((s) => '- $s').join('\n')}
-
-TASK:
-Analyze this poisoning incident and provide a detailed assessment in JSON format with the following structure:
-
-{
-  "riskLevel": "low|moderate|high|emergency",
-  "confidenceScore": 0-100,
-  "urgencyMessage": "Brief urgent message (1-2 sentences)",
-  "detailedExplanation": "Easy-to-understand explanation for pet owner (3-4 sentences)",
-  "immediateActions": [
-    "Action 1 - specific instruction",
-    "Action 2 - specific instruction",
-    "Action 3 - specific instruction"
-  ],
-  "symptoms ToMonitor": [
-    "Symptom 1 to watch for",
-    "Symptom 2 to watch for"
-  ],
-  "requiresVetVisit": true/false,
-  "requiresEmergencyVet": true/false,
-  "timeWindow": "How quickly to act (e.g., 'Within 30 minutes', 'Within 2 hours')",
-  "prognosisIfTreated": "Expected outcome with treatment",
-  "prognosisIfUntreated": "Potential consequences without treatment",
-  "petOwnerGuidance": "Comforting and practical advice for the pet owner (2-3 sentences)"
-}
-
-IMPORTANT GUIDELINES:
-1. Consider pet's size/weight - smaller pets are at higher risk
-2. Consider time elapsed - recent ingestion may require immediate action
-3. Consider symptom severity - active symptoms increase risk
-4. Use clear, non-technical language that pet owners can understand
-5. Be empathetic but direct about serious risks
-6. Provide specific, actionable steps
-7. If emergency, emphasize IMMEDIATE action needed
-
-Respond ONLY with valid JSON, no other text.
-''';
-
-      final content = [Content.text(prompt)];
-      final response = await _model.generateContent(content);
-      final responseText = response.text ?? '';
-
-      // Clean response (remove markdown code blocks if present)
-      String cleanedResponse = responseText
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
-
-      final jsonResponse = json.decode(cleanedResponse);
-
-      return PoisoningAssessmentResult.fromJson(jsonResponse);
-    } catch (e) {
-      print('❌ AI Assessment Error: $e');
-      // Fallback to conservative assessment
+      final orchestrator = PoisoningOrchestrator(progress: progress);
+      final result = await orchestrator.assess(
+        substanceName: substanceName,
+        substanceDescription: substanceDescription,
+        pet: pet,
+        symptoms: symptoms,
+        amountIngested: amountIngested,
+        timeSinceIngestion: timeSinceIngestion,
+      );
+      return PoisoningAssessmentResult.fromJson(result);
+    } catch (_) {
       return PoisoningAssessmentResult.emergency(
-        urgencyMessage: 'Unable to complete AI analysis. Please contact your veterinarian immediately as a precaution.',
-        detailedExplanation: 'We encountered an issue analyzing this incident. When in doubt, it\'s always best to consult with a veterinarian, especially if your pet is showing concerning symptoms.',
+        urgencyMessage:
+            'Unable to complete AI analysis. Please contact your veterinarian immediately as a precaution.',
+        detailedExplanation:
+            'We encountered an issue analysing this incident. When in doubt, it\'s always best to consult with a veterinarian, especially if your pet is showing concerning symptoms.',
       );
     }
   }

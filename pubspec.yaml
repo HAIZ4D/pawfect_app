@@ -23,6 +23,7 @@ dependencies:
 
   # ML & AI
   google_generative_ai: ^0.4.3
+  http: ^1.1.0
   image: ^4.1.3
 
   # Camera & Media (conditional for web)

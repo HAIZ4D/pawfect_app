@@ -1,0 +1,75 @@
+%% Pawfect — AI orchestration
+%% Multi-agent pipelines for illness and poisoning, plus the shared
+%% Gemini client and progress reporting plumbing.
+
+classDiagram
+    direction LR
+
+    class GeminiClient {
+        <<singleton>>
+        +apiKey()
+        +httpClient()
+        +buildModel()
+    }
+
+    class AIAgentService {
+        +diagnose(symptoms, image, pet)
+    }
+
+    class AIPoisoningAssessmentService {
+        +assessPoisoningRisk(...)
+        +getFirstAidInstructions(...)
+    }
+
+    class IllnessOrchestrator {
+        +diagnose() Future~Map~
+    }
+
+    class PoisoningOrchestrator {
+        +assess() Future~Map~
+    }
+
+    class AgentRunner {
+        <<utility>>
+        +runJsonObject()
+        +runVisionJsonObject()
+        +parseJsonObject()
+    }
+
+    class OrchestrationProgress {
+        +List~AgentStage~ stages
+        +int activeIndex
+    }
+
+    class AgentStage {
+        +String title
+        +AgentStatus status
+    }
+
+    class AgentStatus {
+        <<enum>>
+        pending
+        running
+        completed
+        failed
+    }
+
+    %% Decision engines drive their orchestrator
+    AIAgentService --> IllnessOrchestrator
+    AIPoisoningAssessmentService --> PoisoningOrchestrator
+
+    %% Every Gemini call goes through GeminiClient
+    AIAgentService --> GeminiClient
+    AIPoisoningAssessmentService --> GeminiClient
+    IllnessOrchestrator --> GeminiClient
+    PoisoningOrchestrator --> GeminiClient
+
+    %% Orchestrators use the runner + emit progress
+    IllnessOrchestrator --> AgentRunner
+    PoisoningOrchestrator --> AgentRunner
+    IllnessOrchestrator --> OrchestrationProgress : updates
+    PoisoningOrchestrator --> OrchestrationProgress : updates
+
+    %% Progress structure
+    OrchestrationProgress *-- AgentStage
+    AgentStage --> AgentStatus

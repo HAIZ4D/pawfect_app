@@ -84,5 +84,33 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if false;
     }
+
+    // ─── Vet-AI chat sessions ────────────────────────────────────
+    // Each session is anchored to a clinical context (poisoning
+    // incident, illness diagnosis, or general). Messages live in a
+    // `messages` subcollection.
+    //
+    // Session reads use the doc's `userId` field directly. Message
+    // reads check the PARENT session's `userId` instead — that keeps
+    // the rule predicate uniform across the subcollection so a
+    // `messages` list query can be authorised without forcing the
+    // client to filter on `userId` (which would require a composite
+    // index).
+    function ownsParentSession(sessionId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/chat_sessions/$(sessionId))
+             .data.userId == request.auth.uid;
+    }
+
+    match /chat_sessions/{sessionId} {
+      allow read, update, delete: if ownsResource();
+      allow create: if ownsIncoming();
+
+      match /messages/{messageId} {
+        allow read, update, delete: if ownsParentSession(sessionId);
+        allow create: if ownsParentSession(sessionId)
+          && request.resource.data.userId == request.auth.uid;
+      }
+    }
   }
 }

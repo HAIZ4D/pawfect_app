@@ -1,10 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../models/diagnosis_model.dart';
 import '../../../models/pet_model.dart';
+import '../../../models/chat_session_model.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/liquid_background.dart';
+import '../../../repositories/chat_repository.dart';
+import '../../chat/screens/vet_chat_screen.dart';
 import '../repositories/illness_detector_repository.dart';
 import '../widgets/ai_scan_reveal.dart';
 
@@ -128,6 +133,8 @@ class _IllnessResultScreenState extends State<IllnessResultScreen>
                           ),
                           const SizedBox(height: 8),
                           _buildPageDots(),
+                          const SizedBox(height: 22),
+                          _buildAskVetAiCta(),
                           const SizedBox(height: 20),
                           _buildDisclaimer(),
                           const SizedBox(height: 20),
@@ -1290,6 +1297,142 @@ class _IllnessResultScreenState extends State<IllnessResultScreen>
   }
 
   // ─────────────────────────── Disclaimer ───────────────────────────
+  // ─────────────────────────── Ask Vet AI CTA ─────────────────────
+  Widget _buildAskVetAiCta() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _launchVetChat,
+          borderRadius: BorderRadius.circular(22),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_ink, _inkDark],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: _ink.withOpacity(0.32),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: PawfectColors.pawfectOrange.withOpacity(0.22),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(
+                      color: PawfectColors.pawfectOrange.withOpacity(0.45),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.psychology_rounded,
+                    color: PawfectColors.pawfectOrange,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ask the Vet AI',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Follow-up questions about this diagnosis.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white70,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchVetChat() async {
+    HapticFeedback.lightImpact();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    if (uid == null) {
+      scaffoldMessenger.showSnackBar(const SnackBar(
+        content: Text('Please sign in to chat with the vet AI.'),
+      ));
+      return;
+    }
+
+    final pet = widget.pet;
+    final d = widget.diagnosis;
+    final summary = [
+      'Diagnosed condition: ${d.condition}.',
+      if (d.symptoms.isNotEmpty)
+        'Reported symptoms: ${d.symptoms.take(6).join(", ")}.',
+      if (d.mlDetections.isNotEmpty)
+        'Photo findings: ${d.mlDetections.take(4).join(", ")}.',
+      'Urgency: ${d.urgencyLevel}. Confidence: ${d.confidencePercentage}.',
+    ].join(' ');
+
+    final session = ChatSessionModel(
+      userId: uid,
+      petId: pet?.id,
+      petName: pet?.name,
+      petSpecies: pet?.species,
+      contextType: ChatContextType.illness,
+      subject: d.condition,
+      riskLabel: d.urgencyLevel,
+      summary: summary,
+      title: 'About ${d.condition}',
+      createdAt: DateTime.now(),
+      lastMessageAt: DateTime.now(),
+    );
+
+    try {
+      final created = await ChatRepository().createSession(session);
+      await navigator.push(
+        MaterialPageRoute(builder: (_) => VetChatScreen(session: created)),
+      );
+    } catch (_) {
+      scaffoldMessenger.showSnackBar(const SnackBar(
+        content: Text('Couldn\'t open the chat. Try again.'),
+      ));
+    }
+  }
+
   Widget _buildDisclaimer() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),

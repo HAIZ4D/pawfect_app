@@ -1,0 +1,49 @@
+%% Pawfect — high-level architecture
+%% Zoomed-out view: what depends on what. No class internals.
+%% For details inside a subsystem, see the matching diagram-NN file.
+
+flowchart TB
+    UI["UI Screens<br/>(Dashboard, Detector,<br/>Poison Alert, Chat)"]
+
+    subgraph state["State"]
+        AuthProvider
+        PetProvider
+    end
+
+    subgraph repos["Data Access (Firestore)"]
+        AuthRepository
+        PetRepository
+        IllnessDetectorRepository
+        PoisoningIncidentRepository
+        ChatRepository
+        WeightRepository
+        RemindersRepository
+    end
+
+    subgraph ai["AI Layer (Gemini 2.5 Flash)"]
+        GeminiClient
+        AIAgentService
+        AIPoisoningAssessmentService
+        PetHealthChatService
+        PetCareTipService
+    end
+
+    subgraph orch["Orchestration (multi-agent)"]
+        IllnessOrchestrator
+        PoisoningOrchestrator
+        AgentRunner
+    end
+
+    subgraph models["Domain Models"]
+        Models["PetModel, DiagnosisModel,<br/>PoisoningIncidentModel,<br/>ChatSessionModel, ChatMessageModel, ..."]
+    end
+
+    UI --> state
+    UI --> ai
+    state --> repos
+    ai --> orch
+    ai --> GeminiClient
+    orch --> AgentRunner
+    orch --> GeminiClient
+    repos --> models
+    ai --> models

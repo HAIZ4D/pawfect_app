@@ -6,13 +6,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../models/pet_model.dart';
 import '../../../models/symptom_model.dart';
 import '../../../core/constants/colors.dart';
-import '../../../core/widgets/ai_loading_animation.dart';
+import '../../../core/widgets/agent_progress_view.dart';
 import '../../../core/widgets/liquid_app_bar.dart';
 import '../../../core/widgets/liquid_background.dart';
 import '../widgets/symptom_questionnaire_widget.dart';
 import 'illness_result_screen.dart';
 import '../../../services/gemini_service.dart';
 import '../../../services/ai_agent_service.dart';
+import '../../../services/orchestration/agent_stage.dart';
+import '../../../services/orchestration/illness_orchestrator.dart';
 
 /// Illness detector consultation — editorial spread.
 ///
@@ -38,11 +40,33 @@ class _IllnessDetectorCameraScreenState
   bool _isAnalyzing = false;
   List<SymptomModel> _selectedSymptoms = [];
 
+  /// Live progress for the 6-stage illness orchestrator pipeline
+  /// (5 agents + a finalising content-gen stage). The orchestrator
+  /// updates this; AgentProgressView listens.
+  late final ValueNotifier<OrchestrationProgress> _progress =
+      ValueNotifier(OrchestrationProgress(
+    stages: [
+      ...IllnessOrchestrator.defaultStages,
+      const AgentStage(
+        key: 'finalising',
+        title: 'Finalising care plan',
+        subtitle: 'Explanation, first aid, vet report.',
+      ),
+    ],
+    activeIndex: -1,
+  ));
+
   // ─── Palette ──────────────────────────────────────────────────────
   static const Color _ink = Color(0xFF2D3142);
   static const Color _inkDark = Color(0xFF1F232E);
   static const Color _inkSoft = Color(0xFF5A5F72);
   static const Color _hairline = Color(0x14000000);
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -927,16 +951,16 @@ class _IllnessDetectorCameraScreenState
 
   // ─────────────────────────── Analyzing view ───────────────────────
   Widget _buildAnalyzingView() {
-    return AILoadingAnimation(
-      title: 'AI Analysis in Progress',
-      subtitle:
-          "Our AI agent is carefully analyzing your pet's condition",
-      steps: const [
-        LoadingStep(emoji: '', text: 'Processing image with Gemini vision'),
-        LoadingStep(emoji: '', text: 'Analyzing symptoms and patterns'),
-        LoadingStep(emoji: '', text: 'Consulting Gemini AI'),
-        LoadingStep(emoji: '', text: 'Generating diagnosis report'),
-        LoadingStep(emoji: '', text: 'Preparing recommendations'),
+    return Stack(
+      children: [
+        const LiquidBackground(density: 0.45),
+        AgentProgressView(
+          progress: _progress,
+          title: 'Illness diagnosis',
+          subtitle:
+              'Six specialised agents reviewing the photo, symptoms, and consistency.',
+          italicAccent: 'Grounded in evidence, not guesses.',
+        ),
       ],
     );
   }
@@ -996,6 +1020,7 @@ class _IllnessDetectorCameraScreenState
         symptoms: _selectedSymptoms,
         image: _selectedImage,
         pet: widget.selectedPet,
+        progress: _progress,
       );
 
       if (mounted) {

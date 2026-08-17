@@ -1,0 +1,52 @@
+%% Pawfect — vet AI chat subsystem
+%% Entry points, service, persistence.
+
+classDiagram
+    direction TB
+
+    class IllnessResultScreen
+    class AIPoisoningAssessmentScreen
+    class VetChatScreen
+
+    class PetHealthChatService {
+        +sendMessage(text) Future~String~
+        +suggestedPrompts() List~String~
+    }
+
+    class ChatRepository {
+        +createSession()
+        +appendMessage()
+        +streamMessages()
+    }
+
+    class ChatSessionModel {
+        +ChatContextType contextType
+        +String subject
+        +String riskLabel
+        +String summary
+    }
+
+    class ChatMessageModel {
+        +ChatRole role
+        +String text
+    }
+
+    class GeminiClient
+
+    %% Entry points launch chat with a session
+    IllnessResultScreen --> ChatRepository : createSession
+    IllnessResultScreen --> VetChatScreen : pushes
+    AIPoisoningAssessmentScreen --> ChatRepository : createSession
+    AIPoisoningAssessmentScreen --> VetChatScreen : pushes
+
+    %% Chat screen pipes user turns through the service + repo
+    VetChatScreen --> PetHealthChatService : sendMessage
+    VetChatScreen --> ChatRepository : streamMessages
+
+    %% Service uses Gemini with a session-aware system instruction
+    PetHealthChatService --> GeminiClient
+    PetHealthChatService ..> ChatSessionModel : reads context
+
+    %% Repo persists session + messages
+    ChatRepository ..> ChatSessionModel
+    ChatRepository ..> ChatMessageModel

@@ -1,29 +1,25 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/pet_model.dart';
+import 'gemini_client.dart';
 
 /// Service for generating pet care tips using Gemini AI
 class PetCareTipService {
   late GenerativeModel _model;
   bool _initialized = false;
 
-  /// Initialize Gemini AI with API key
+  /// Initialize Gemini AI. The [apiKey] parameter is accepted for
+  /// historical reasons but ignored — the key is resolved centrally
+  /// from `.env` via [GeminiClient].
   Future<void> initialize(String apiKey) async {
-    try {
-      _model = GenerativeModel(
-        model: 'gemini-2.5-flash',
-        apiKey: apiKey,
-        generationConfig: GenerationConfig(
-          temperature: 0.9,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 256,
-        ),
-      );
-      _initialized = true;
-    } catch (e) {
-      print('Error initializing PetCareTipService: $e');
-      rethrow;
-    }
+    _model = GeminiClient.buildModel(
+      generationConfig: GenerationConfig(
+        temperature: 0.9,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 256,
+      ),
+    );
+    _initialized = true;
   }
 
   /// Check if service is initialized

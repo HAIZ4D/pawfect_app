@@ -1,118 +1,110 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../models/pet_model.dart';
 import '../models/symptom_model.dart';
 import '../models/diagnosis_model.dart';
 import 'gemini_service.dart';
+import 'orchestration/illness_orchestrator.dart';
+import 'orchestration/agent_stage.dart';
 
-/// AI Agent Decision Engine
-/// Combines Gemini multimodal image analysis + symptom data
-/// to provide comprehensive illness detection and recommendations.
+/// AI Agent Decision Engine — orchestrated edition.
+///
+/// The diagnostic reasoning is now produced by [IllnessOrchestrator]
+/// (five specialised agents in series + parallel). This service stitches
+/// the orchestrator's structured output together with Gemini's
+/// content-generation calls (explanation, first aid, vet report) and
+/// the deterministic urgency / confidence / recommendation logic that
+/// existed before, producing a complete [DiagnosisModel].
 class AIAgentService {
   final GeminiService _geminiService;
 
   AIAgentService({required GeminiService geminiService})
       : _geminiService = geminiService;
 
-  /// Main diagnosis method - combines all AI components
+  /// Diagnose using the orchestrated pipeline.
   ///
-  /// This is the core decision engine that:
-  /// 1. Analyzes image with Gemini vision (if provided)
-  /// 2. Processes symptoms
-  /// 3. Uses Gemini to combine results into a structured diagnosis
-  /// 4. Calculates urgency level
-  /// 5. Generates recommendations
+  /// [progress] is an optional [ValueNotifier] the caller renders in a
+  /// multi-stage loading UI. Eight stages: 5 orchestrator agents
+  /// followed by 3 content-generation agents running in parallel.
   Future<DiagnosisModel> diagnose({
     required List<SymptomModel> symptoms,
     File? image,
     PetModel? pet,
+    ValueNotifier<OrchestrationProgress>? progress,
   }) async {
     try {
-      print('AI Agent: Starting diagnosis...');
-      print('Symptoms: ${symptoms.length}');
-      print('Image: ${image != null ? 'Provided' : 'Not provided'}');
-      print('Pet: ${pet?.name ?? 'Not specified'}');
+      _seedFullPipeline(progress);
 
-      // Step 1: Analyze image with Gemini vision (if provided)
-      Map<String, dynamic>? mlResults;
-      if (image != null && _geminiService.isInitialized) {
-        print('Step 1: Running Gemini vision analysis...');
-        mlResults = await _geminiService.analyzeImage(image, pet: pet);
-        print('Vision analysis complete: ${mlResults['detectedConditions']}');
-      } else {
-        print('Step 1: Skipping image analysis (no image provided)');
-      }
-
-      // Step 2: Use Gemini AI to analyze condition
-      print('🔄 Step 2: Running Gemini AI analysis...');
-      final aiAnalysis = await _geminiService.analyzeCondition(
+      // Stages 0-4: orchestrated diagnosis.
+      final orchestrator = IllnessOrchestrator(progress: progress);
+      final aiAnalysis = await orchestrator.diagnose(
         symptoms: symptoms,
-        mlResults: mlResults,
+        image: image,
         pet: pet,
       );
-      print('✅ Gemini analysis complete: ${aiAnalysis['mostLikelyCondition']}');
 
-      // Step 3: Calculate urgency level
-      print('🔄 Step 3: Calculating urgency level...');
+      final mlResults = aiAnalysis['mlResults'] as Map<String, dynamic>?;
+      final condition = (aiAnalysis['mostLikelyCondition'] as String?) ??
+          'Condition requires veterinary evaluation';
+
+      // Safety net: deterministic urgency over Gemini's call so a
+      // critical red flag (seizures, bloat, paralysis) escalates even
+      // if the synthesis agent under-classifies it.
       final urgencyLevel = _calculateUrgencyLevel(
         symptoms: symptoms,
         mlResults: mlResults,
         aiAnalysis: aiAnalysis,
       );
-      print('✅ Urgency level: $urgencyLevel');
 
-      // Step 4: Calculate confidence score
       final confidence = _calculateConfidence(
         symptoms: symptoms,
         mlResults: mlResults,
         aiAnalysis: aiAnalysis,
       );
-      print('✅ Confidence: ${(confidence * 100).toStringAsFixed(1)}%');
 
-      // Step 5: Generate human-friendly explanation
-      print('🔄 Step 5: Generating explanation...');
-      final explanation = await _geminiService.generateDiagnosisExplanation(
-        condition: aiAnalysis['mostLikelyCondition'] ?? 'Unknown condition',
-        symptoms: symptoms,
-        urgencyLevel: urgencyLevel,
-        confidence: confidence,
-        pet: pet,
-        mlResults: mlResults,
-      );
-      print('✅ Explanation generated');
+      // Stage 5: explanation + first aid + vet report in parallel so
+      // the slow steps don't compound. Reflected as one "Finalising"
+      // stage in the progress UI.
+      _markStageRunning(progress, 5);
+      final contentResults = await Future.wait([
+        _geminiService.generateDiagnosisExplanation(
+          condition: condition,
+          symptoms: symptoms,
+          urgencyLevel: urgencyLevel,
+          confidence: confidence,
+          pet: pet,
+          mlResults: mlResults,
+        ),
+        _geminiService.generateFirstAidInstructions(
+          condition: condition,
+          urgencyLevel: urgencyLevel,
+          symptoms: symptoms,
+          pet: pet,
+        ),
+        _geminiService.generateVetReport(
+          condition: condition,
+          symptoms: symptoms,
+          urgencyLevel: urgencyLevel,
+          confidence: confidence,
+          detectionTime: DateTime.now(),
+          pet: pet,
+          mlResults: mlResults,
+        ),
+      ]);
+      _markStageCompleted(progress, 5);
 
-      // Step 6: Generate first-aid instructions
-      print('🔄 Step 6: Generating first-aid instructions...');
-      final firstAid = await _geminiService.generateFirstAidInstructions(
-        condition: aiAnalysis['mostLikelyCondition'] ?? 'Unknown condition',
-        urgencyLevel: urgencyLevel,
-        symptoms: symptoms,
-        pet: pet,
-      );
-      print('✅ First-aid instructions generated');
+      final explanation = contentResults[0];
+      final firstAid = contentResults[1];
+      final vetReport = contentResults[2];
 
-      // Step 7: Generate vet report
-      print('🔄 Step 7: Generating vet report...');
-      final vetReport = await _geminiService.generateVetReport(
-        condition: aiAnalysis['mostLikelyCondition'] ?? 'Unknown condition',
-        symptoms: symptoms,
-        urgencyLevel: urgencyLevel,
-        confidence: confidence,
-        detectionTime: DateTime.now(),
-        pet: pet,
-        mlResults: mlResults,
-      );
-      print('✅ Vet report generated');
-
-      // Step 8: Compile recommendations
       final recommendations = _generateRecommendations(
         urgencyLevel: urgencyLevel,
         aiAnalysis: aiAnalysis,
         mlResults: mlResults,
       );
 
-      // Create comprehensive diagnosis result
-      final diagnosis = DiagnosisModel(
-        condition: aiAnalysis['mostLikelyCondition'] ?? 'Condition requires veterinary evaluation',
+      return DiagnosisModel(
+        condition: condition,
         symptoms: symptoms.map((s) => s.name).toList(),
         urgencyLevel: urgencyLevel,
         confidence: confidence,
@@ -123,48 +115,81 @@ class AIAgentService {
         timestamp: DateTime.now(),
         petId: pet?.id,
         petName: pet?.name,
-        mlDetections: mlResults?['detectedConditions'] ?? [],
-        mlAnalysis: mlResults?['analysis'],
-        riskFactors: List<String>.from(aiAnalysis['riskFactors'] ?? []),
+        mlDetections: mlResults?['detectedConditions'] is List
+            ? List<String>.from(mlResults!['detectedConditions'] as List)
+            : <String>[],
+        mlAnalysis: mlResults?['analysis'] as String?,
+        riskFactors: List<String>.from(aiAnalysis['riskFactors'] ?? const []),
       );
-
-      print('🎉 AI Agent: Diagnosis complete!');
-      return diagnosis;
-    } catch (e) {
-      print('❌ AI Agent error: $e');
-
-      // Return fallback diagnosis
+    } catch (_) {
       return DiagnosisModel(
         condition: 'Analysis incomplete - Please consult veterinarian',
         symptoms: symptoms.map((s) => s.name).toList(),
         urgencyLevel: 'MODERATE',
         confidence: 0.5,
-        explanation: 'We encountered an issue analyzing the symptoms. Please consult with a veterinarian for proper diagnosis.',
-        recommendations: ['Consult veterinarian', 'Monitor symptoms', 'Keep pet comfortable'],
-        firstAidInstructions: 'Ensure pet is comfortable and safe. Contact your veterinarian for guidance.',
-        vetReport: 'Automatic report generation unavailable. Please describe symptoms to your veterinarian.',
+        explanation:
+            'We encountered an issue analysing the symptoms. Please consult with a veterinarian for proper diagnosis.',
+        recommendations: const [
+          'Consult veterinarian',
+          'Monitor symptoms',
+          'Keep pet comfortable',
+        ],
+        firstAidInstructions:
+            'Ensure pet is comfortable and safe. Contact your veterinarian for guidance.',
+        vetReport:
+            'Automatic report generation unavailable. Please describe symptoms to your veterinarian.',
         timestamp: DateTime.now(),
         petId: pet?.id,
         petName: pet?.name,
-        mlDetections: [],
-        riskFactors: ['Analysis error occurred'],
+        mlDetections: const [],
+        riskFactors: const ['Analysis error occurred'],
       );
     }
   }
 
-  /// Calculate urgency level based on all available data
-  ///
-  /// Returns: EMERGENCY, HIGH, MODERATE, or LOW
+  // ─── Progress plumbing ───────────────────────────────────────────
+  /// Seed the progress notifier with all 6 visible stages: 5 from the
+  /// orchestrator + 1 "Finalising" for the parallel content gen.
+  void _seedFullPipeline(ValueNotifier<OrchestrationProgress>? progress) {
+    if (progress == null) return;
+    progress.value = OrchestrationProgress(
+      stages: [
+        ...IllnessOrchestrator.defaultStages,
+        const AgentStage(
+          key: 'finalising',
+          title: 'Finalising care plan',
+          subtitle: 'Explanation, first aid, vet report.',
+        ),
+      ],
+      activeIndex: -1,
+    );
+  }
+
+  void _markStageRunning(
+    ValueNotifier<OrchestrationProgress>? progress,
+    int index,
+  ) {
+    if (progress == null) return;
+    progress.value = progress.value.markRunning(index);
+  }
+
+  void _markStageCompleted(
+    ValueNotifier<OrchestrationProgress>? progress,
+    int index,
+  ) {
+    if (progress == null) return;
+    progress.value = progress.value.markCompleted(index);
+  }
+
+  // ─── Deterministic urgency safety net ────────────────────────────
   String _calculateUrgencyLevel({
     required List<SymptomModel> symptoms,
     Map<String, dynamic>? mlResults,
     Map<String, dynamic>? aiAnalysis,
   }) {
-    // Start with AI's recommendation if available
     String urgency = aiAnalysis?['urgencyLevel'] ?? 'MODERATE';
 
-    // Critical symptoms that override to EMERGENCY
-    final emergencySymptoms = [
+    const emergencySymptoms = [
       'difficulty breathing',
       'seizures',
       'collapse',
@@ -175,16 +200,14 @@ class AIAgentService {
       'unable to urinate',
       'paralysis',
     ];
-
     for (final symptom in symptoms) {
-      if (emergencySymptoms.any((emergency) =>
-          symptom.name.toLowerCase().contains(emergency))) {
+      if (emergencySymptoms
+          .any((e) => symptom.name.toLowerCase().contains(e))) {
         return 'EMERGENCY';
       }
     }
 
-    // High-risk symptoms
-    final highRiskSymptoms = [
+    const highRiskSymptoms = [
       'blood in stool',
       'blood in urine',
       'vomiting blood',
@@ -193,76 +216,50 @@ class AIAgentService {
       'pale gums',
       'high fever',
     ];
-
     for (final symptom in symptoms) {
-      if (highRiskSymptoms.any((high) =>
-          symptom.name.toLowerCase().contains(high))) {
-        if (urgency != 'EMERGENCY') {
-          urgency = 'HIGH';
-        }
+      if (highRiskSymptoms
+          .any((h) => symptom.name.toLowerCase().contains(h))) {
+        if (urgency != 'EMERGENCY') urgency = 'HIGH';
       }
     }
 
-    // ML detection severity
     if (mlResults != null && mlResults['hasDetections'] == true) {
       final detections = mlResults['detections'] as List<dynamic>;
       for (final detection in detections) {
         if (detection['severity'] == 'HIGH') {
-          if (urgency == 'MODERATE' || urgency == 'LOW') {
-            urgency = 'HIGH';
-          }
+          if (urgency == 'MODERATE' || urgency == 'LOW') urgency = 'HIGH';
         }
       }
     }
 
-    // Multiple symptoms increase urgency
-    if (symptoms.length >= 5 && urgency == 'LOW') {
-      urgency = 'MODERATE';
-    }
-
+    if (symptoms.length >= 5 && urgency == 'LOW') urgency = 'MODERATE';
     return urgency;
   }
 
-  /// Calculate confidence score
-  ///
-  /// Combines:
-  /// - Number of symptoms
-  /// - ML detection confidence
-  /// - AI analysis confidence
+  // ─── Confidence blend ────────────────────────────────────────────
   double _calculateConfidence({
     required List<SymptomModel> symptoms,
     Map<String, dynamic>? mlResults,
     Map<String, dynamic>? aiAnalysis,
   }) {
-    double confidence = 0.5; // Base confidence
-
-    // Symptom count contribution (0.0 to 0.3)
+    double confidence = 0.5;
     final symptomScore = (symptoms.length / 10).clamp(0.0, 0.3);
     confidence += symptomScore;
 
-    // ML detection contribution (0.0 to 0.35)
     if (mlResults != null && mlResults['topConfidence'] != null) {
-      final mlScore = (mlResults['topConfidence'] as double) * 0.35;
+      final mlScore = (mlResults['topConfidence'] as num).toDouble() * 0.35;
       confidence += mlScore;
     }
 
-    // AI analysis contribution (0.0 to 0.35)
     if (aiAnalysis != null && aiAnalysis['confidence'] != null) {
-      final aiScore = (aiAnalysis['confidence'] as double) * 0.35;
+      final aiScore = (aiAnalysis['confidence'] as num).toDouble() * 0.35;
       confidence += aiScore;
     }
 
     return confidence.clamp(0.0, 1.0);
   }
 
-  /// Generate actionable recommendations.
-  ///
-  /// Order:
-  ///   1. Gemini's condition-specific recommendations (most useful — these
-  ///      name the actual condition).
-  ///   2. ML-derived recommendations (only when image showed something).
-  ///   3. Urgency-tier boilerplate as a fallback so the list is never empty.
-  /// Duplicates are stripped case-insensitively while preserving order.
+  // ─── Recommendations ─────────────────────────────────────────────
   List<String> _generateRecommendations({
     required String urgencyLevel,
     Map<String, dynamic>? aiAnalysis,
@@ -270,7 +267,6 @@ class AIAgentService {
   }) {
     final ordered = <String>[];
 
-    // 1. Gemini's specific recommendations lead.
     if (aiAnalysis != null && aiAnalysis['recommendations'] is List) {
       for (final rec in aiAnalysis['recommendations'] as List) {
         final s = rec.toString().trim();
@@ -278,7 +274,6 @@ class AIAgentService {
       }
     }
 
-    // 2. ML-derived condition-specific recommendations.
     if (mlResults != null && mlResults['hasDetections'] == true) {
       ordered.add('Share the captured photo with your veterinarian');
       final detections = mlResults['detectedConditions'] as List<dynamic>;
@@ -296,7 +291,6 @@ class AIAgentService {
       }
     }
 
-    // 3. Urgency-tier boilerplate at the end (only adds what's missing).
     final fallback = switch (urgencyLevel) {
       'EMERGENCY' => const [
           'Seek immediate veterinary care',
@@ -308,7 +302,7 @@ class AIAgentService {
           'Monitor symptoms closely and note any changes',
         ],
       'MODERATE' => const [
-          'Schedule a vet appointment within 2–3 days',
+          'Schedule a vet appointment within 2-3 days',
           'Keep your pet comfortable and well hydrated',
         ],
       'LOW' => const [
@@ -319,7 +313,6 @@ class AIAgentService {
     };
     ordered.addAll(fallback);
 
-    // Dedupe case-insensitively, preserving first occurrence.
     final seen = <String>{};
     final result = <String>[];
     for (final r in ordered) {
@@ -329,19 +322,31 @@ class AIAgentService {
     return result;
   }
 
-  /// Quick symptom-only analysis (when no image available)
+  /// Symptom-only diagnosis (no image).
   Future<DiagnosisModel> analyzeSymptoms({
     required List<SymptomModel> symptoms,
     PetModel? pet,
-  }) async {
-    return diagnose(symptoms: symptoms, image: null, pet: pet);
+    ValueNotifier<OrchestrationProgress>? progress,
+  }) {
+    return diagnose(
+      symptoms: symptoms,
+      image: null,
+      pet: pet,
+      progress: progress,
+    );
   }
 
-  /// Quick image-only analysis (when no symptoms reported)
+  /// Image-only diagnosis (no symptoms).
   Future<DiagnosisModel> analyzeImage({
     required File image,
     PetModel? pet,
-  }) async {
-    return diagnose(symptoms: [], image: image, pet: pet);
+    ValueNotifier<OrchestrationProgress>? progress,
+  }) {
+    return diagnose(
+      symptoms: const [],
+      image: image,
+      pet: pet,
+      progress: progress,
+    );
   }
 }

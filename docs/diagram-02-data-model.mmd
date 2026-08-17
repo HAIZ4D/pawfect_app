@@ -1,0 +1,105 @@
+%% Pawfect — data model
+%% Just the domain entities and their enum dependencies.
+
+classDiagram
+    direction TB
+
+    class PetModel {
+        +String id
+        +String userId
+        +String name
+        +String species
+        +String breed
+        +DateTime birthdate
+        +double weight
+    }
+
+    class DiagnosisModel {
+        +String condition
+        +String urgencyLevel
+        +double confidence
+        +List~String~ recommendations
+        +String petId
+    }
+
+    class SymptomModel {
+        +String name
+        +String category
+    }
+
+    class ToxicSubstanceModel {
+        +String name
+        +String category
+        +ToxicityLevel toxicityLevel
+        +int timeToReact
+    }
+
+    class PoisoningIncidentModel {
+        +String userId
+        +String petId
+        +String substanceName
+        +RiskLevel assessedRiskLevel
+        +DateTime incidentTime
+    }
+
+    class PoisoningAssessmentResult {
+        +RiskLevel riskLevel
+        +int confidenceScore
+        +String urgencyMessage
+        +List~String~ immediateActions
+    }
+
+    class ChatSessionModel {
+        +String userId
+        +String petId
+        +ChatContextType contextType
+        +String subject
+        +String riskLabel
+    }
+
+    class ChatMessageModel {
+        +String sessionId
+        +ChatRole role
+        +String text
+        +DateTime timestamp
+    }
+
+    class RiskLevel {
+        <<enum>>
+        low
+        moderate
+        high
+        emergency
+    }
+
+    class ToxicityLevel {
+        <<enum>>
+        mild
+        moderate
+        severe
+        fatal
+    }
+
+    class ChatContextType {
+        <<enum>>
+        poisoning
+        illness
+        general
+    }
+
+    class ChatRole {
+        <<enum>>
+        user
+        assistant
+    }
+
+    %% Relationships
+    DiagnosisModel ..> PetModel
+    PoisoningIncidentModel ..> PetModel
+    PoisoningIncidentModel --> RiskLevel
+    PoisoningAssessmentResult --> RiskLevel
+    ToxicSubstanceModel --> ToxicityLevel
+    ChatSessionModel ..> PetModel
+    ChatSessionModel --> ChatContextType
+    ChatMessageModel ..> ChatSessionModel
+    ChatMessageModel --> ChatRole
