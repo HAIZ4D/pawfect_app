@@ -55,6 +55,7 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
   mockito: ^5.4.4
   build_runner: ^2.4.6
 
@@ -64,3 +65,22 @@ flutter:
   assets:
     - assets/images/
     - .env
+
+# Launcher icons. Sources are built from assets/images/pawfect-logo.png,
+# which is 1920x1080 and transparent, so it cannot be used directly:
+# icons must be square and iOS composites any alpha channel to black.
+#   icon_source.png     square, cream background, fully opaque
+#   icon_foreground.png transparent art inset for the adaptive-icon mask
+# Regenerate with: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/icon/icon_source.png"
+  android: "ic_launcher"
+  adaptive_icon_background: "#FFF4DB"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "assets/icon/icon_source.png"
+    background_color: "#FFF4DB"
+    theme_color: "#FDA002"

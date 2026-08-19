@@ -91,7 +91,7 @@ class IllnessOrchestrator {
         temperature: 0.55,
         topK: 32,
         topP: 0.92,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
       ),
     );
 
@@ -257,33 +257,70 @@ class IllnessOrchestrator {
         : 'Subject: ${pet.species}${pet.breed.isNotEmpty ? " (${pet.breed})" : ""}.';
 
     final prompt = '''
-You are the VISION agent in a multi-agent veterinary diagnostic pipeline. You only describe what is visible. You do NOT diagnose. You do NOT recommend treatment. Other agents handle those.
+You are the VISION agent in a multi-agent veterinary pipeline, reading this photo at the level of a board-certified veterinary dermatologist. You describe and rank what is visible. You do NOT prescribe treatment. Other agents handle that.
 
 $speciesLine
 
-Examine the attached photo. Identify visible findings in these categories:
-- Skin (lesions, redness, hair loss, dandruff)
-- Wounds (cuts, abrasions, swelling, bleeding)
-- Parasites (visible fleas, ticks, mites)
-- Eyes (discharge, redness, cloudiness, swelling)
-- Mouth and gums (color, lesions, dental issues)
-- Posture and body condition (limping, lethargy, weight)
+Examine the photo in two passes.
+
+PASS 1. General findings across every visible area: skin and coat, wounds, external parasites, eyes, ears, mouth and gums, posture and body condition.
+
+PASS 2. If any skin or coat is visible, perform a dermatologic read using real morphology terms.
+- Primary lesions: macule, patch, papule, plaque, pustule, vesicle, bulla, wheal, nodule, tumour.
+- Secondary lesions: scale, crust, erosion, ulcer, excoriation, lichenification, hyperpigmentation, epidermal collarette, comedone, fissure.
+- Alopecia pattern: focal, multifocal, annular, symmetrical, diffuse, and self-induced (broken hair shafts) versus spontaneous.
+- Distribution matters as much as the lesion itself. Name it precisely: pinnae, periocular, muzzle, chin, dorsal neck, lumbosacral, ventral abdomen, tail base, interdigital, flank.
+
+Rank the differential from this set, choosing whatever genuinely fits. Do not force a match.
+Dermatophytosis (ringworm), Notoedric mange, Sarcoptic mange, Demodicosis, Cheyletiellosis, Otodectic mange (ear mites), Flea allergy dermatitis, Atopic dermatitis, Food allergy dermatitis, Contact dermatitis, Bacterial pyoderma, Malassezia dermatitis, Feline acne, Eosinophilic granuloma complex, Psychogenic alopecia, Abscess, Solar dermatitis, Seborrhea, Acute moist dermatitis, Neoplasia, Healthy skin.
+
+Discriminators to apply honestly:
+- Dermatophytosis: expanding annular alopecia with fine scale and broken hairs, often pinnae, muzzle, forelimbs. Itch mild or absent.
+- Notoedric mange: intense itch with thick adherent yellow-grey crust starting at the ear margins, then muzzle and periocular.
+- Sarcoptic mange: intense itch, papular crusting at ear margins, elbows, hocks, ventral abdomen.
+- Flea allergy dermatitis: miliary crusted papules over the lumbosacral dorsum and tail base, often with flea dirt.
+- Feline acne: comedones confined to the chin.
+- Eosinophilic granuloma: well-demarcated raised eroded plaque, often lip, thigh, or ventral abdomen.
+- Psychogenic alopecia: clean symmetrical hair loss over intact non-inflamed skin, broken shafts, ventral abdomen and flanks.
+- Bacterial pyoderma: pustules and epidermal collarettes, usually ventral trunk.
+- Malassezia dermatitis: greasy erythema with lichenification in skin folds and interdigital spaces.
+- Healthy skin: even coat, no lesion, no scale, no erythema. Say so plainly and rank it first.
 
 Return ONLY valid JSON in this exact shape. No prose. No fences.
 
 {
   "findings": [
     {
-      "area": "skin|wound|parasites|eye|mouth|posture|other",
-      "description": "<concrete observation, e.g. 'crusty lesion behind left ear, ~1cm'>",
+      "area": "skin|wound|parasites|eye|ear|mouth|posture|other",
+      "description": "<concrete observation with location and approximate size>",
       "severity": "MILD|MODERATE|SEVERE"
     }
   ],
+  "dermatology": {
+    "skinVisible": <true|false>,
+    "appearsHealthy": <true|false>,
+    "lesionMorphology": ["<morphology term with location>"],
+    "distribution": "<precise anatomical pattern, or 'not applicable'>",
+    "pruritusEvidence": "<visible sign of itch such as excoriation or broken hairs, or 'none visible'>",
+    "candidates": [
+      {
+        "condition": "<name from the set above>",
+        "likelihood": <number 0..1>,
+        "featuresSeen": ["<specific visible feature supporting this>"],
+        "featuresAgainst": ["<specific feature that argues against this>"],
+        "confirmatoryTest": "<the test a vet would actually run, e.g. 'Wood lamp screen then DTM fungal culture', 'superficial skin scrape', 'flea comb for flea dirt', 'tape impression cytology'>"
+      }
+    ]
+  },
   "imageQuality": "GOOD|ACCEPTABLE|POOR",
   "summary": "<one sentence overall impression>"
 }
 
-If nothing abnormal is visible, return an empty findings array and say so in summary.
+RULES:
+- Up to 3 dermatology candidates, ordered by likelihood descending.
+- If the skin looks normal, set appearsHealthy true and return one candidate, "Healthy skin".
+- If no skin is visible, set skinVisible false and return an empty candidates array.
+- Never invent a lesion you cannot see. If image quality limits the read, say so in summary and lower every likelihood.
 ''';
 
     try {
@@ -294,6 +331,14 @@ If nothing abnormal is visible, return an empty findings array and say so in sum
         imageBytes: bytes,
         fallback: {
           'findings': const [],
+          'dermatology': const {
+            'skinVisible': false,
+            'appearsHealthy': false,
+            'lesionMorphology': [],
+            'distribution': 'not applicable',
+            'pruritusEvidence': 'none visible',
+            'candidates': [],
+          },
           'imageQuality': 'POOR',
           'summary': 'Vision analysis unavailable.',
         },
@@ -402,6 +447,8 @@ RULES:
 - "condition" must be a real named veterinary condition. NO generic labels like "Skin Issue" or "Condition Detected".
 - supportingEvidence and contradictoryEvidence are pulled from the evidence above. Quote it accurately.
 - If evidence is too thin for three candidates, return fewer (one or two is fine).
+- The vision agent's "dermatology" block is a structured dermatologic read of the actual photo. When it names candidates, carry its top condition into your list under the same name and reuse its morphology and distribution as supportingEvidence. Rank it lower only if the reported symptoms genuinely contradict it, and say why in rationale.
+- When that block sets appearsHealthy true, do not invent a skin condition. Look to the reported symptoms for a non-dermatologic explanation. If there is none, return "Healthy skin" as a candidate with high probability.
 ''';
 
     return AgentRunner.runJsonObject(
